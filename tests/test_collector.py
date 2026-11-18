@@ -4,10 +4,10 @@ from datetime import date
 
 import pytest
 
-from app.collector import collect_platform
-from app.github_client import RepoHit
-from app.models import Snapshot, SnapshotItem
-from app.summarizer import content_hash
+from backend.collector import collect_platform
+from backend.github_client import RepoHit
+from backend.models import Snapshot, SnapshotItem
+from backend.summarizer import content_hash
 
 
 class FakeGitHub:
@@ -146,9 +146,9 @@ async def test_llm_failure_translates_ko_when_enabled(db_session, settings, monk
     async def fake_translate(text):
         return f"[KO]{text}"
 
-    monkeypatch.setattr("app.summarizer.translate_ko", fake_translate)
+    monkeypatch.setattr("backend.summarizer.translate_ko", fake_translate)
     # collector는 모듈 레벨에서 import한 함수를 쓰므로 summarizer 쪽을 패치
-    import app.collector as collector_mod
+    import backend.collector as collector_mod
 
     # fallback_summaries_async 내부에서 translate_ko를 참조하므로 summarizer 모듈 패치로 충분
     q = settings.platform_queries()["claude"][0]

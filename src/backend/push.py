@@ -7,8 +7,8 @@ import logging
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.config import Settings
-from app.models import PushSubscription, Snapshot
+from backend.config import Settings
+from backend.models import PushSubscription, Snapshot
 
 logger = logging.getLogger(__name__)
 

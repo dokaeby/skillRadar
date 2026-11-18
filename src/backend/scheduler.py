@@ -6,9 +6,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.collector import collect_all
-from app.config import Settings
-from app.push import notify_daily_top
+from backend.collector import collect_all
+from backend.config import Settings
+from backend.push import notify_daily_top
 
 logger = logging.getLogger(__name__)
 

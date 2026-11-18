@@ -1,14 +1,14 @@
-"""일회성 수집 CLI. Render Cron Job 등에서 `python -m app.cli_collect`로 실행."""
+"""일회성 수집 CLI. Render Cron Job 등에서 `python -m backend.cli_collect`로 실행."""
 
 import asyncio
 import logging
 
 from sqlalchemy.orm import sessionmaker
 
-from app.collector import collect_all
-from app.config import get_settings
-from app.db import get_engine, init_db, session_factory
-from app.push import notify_daily_top
+from backend.collector import collect_all
+from backend.config import get_settings
+from backend.db import get_engine, init_db, session_factory
+from backend.push import notify_daily_top
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 

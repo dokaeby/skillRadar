@@ -8,10 +8,10 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from app.config import Settings, get_settings
-from app.db import get_engine, init_db, session_factory
-from app.routes import router
-from app.scheduler import start_scheduler, stop_scheduler
+from backend.config import Settings, get_settings
+from backend.db import get_engine, init_db, session_factory
+from backend.routes import router
+from backend.scheduler import start_scheduler, stop_scheduler
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -47,3 +47,6 @@ def _make_templates():
     from jinja2 import Environment, FileSystemLoader
 
     return Environment(loader=FileSystemLoader(str(BASE_DIR / "templates")), autoescape=True)
+
+
+app = create_app()

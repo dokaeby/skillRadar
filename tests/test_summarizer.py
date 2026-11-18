@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 
-from app.summarizer import (
+from backend.summarizer import (
     Summarizer,
     _extract_json,
     _normalize,
@@ -25,7 +25,7 @@ def _no_real_translate(monkeypatch):
     async def fake_translate(text: str) -> str:
         return "\n".join(f"[ko]{line}" for line in text.split("\n"))
 
-    monkeypatch.setattr("app.summarizer.translate_ko", fake_translate)
+    monkeypatch.setattr("backend.summarizer.translate_ko", fake_translate)
 
 
 def _ok_response(payload: dict) -> httpx.Response:

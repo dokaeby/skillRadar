@@ -7,10 +7,10 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import Settings
-from app.github_client import GitHubClient, RepoHit, stars_delta, today_kst
-from app.models import Snapshot, SnapshotItem
-from app.summarizer import (
+from backend.config import Settings
+from backend.github_client import GitHubClient, RepoHit, stars_delta, today_kst
+from backend.models import Snapshot, SnapshotItem
+from backend.summarizer import (
     Summarizer,
     content_hash,
     fallback_summaries,

@@ -10,11 +10,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import PLATFORMS, Settings, get_settings
-from app.db import get_session
-from app.github_client import today_kst
-from app.models import Snapshot
-from app.scheduler import run_daily_collect
+from backend.config import PLATFORMS, Settings, get_settings
+from backend.db import get_session
+from backend.github_client import today_kst
+from backend.models import Snapshot
+from backend.scheduler import run_daily_collect
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -140,7 +140,7 @@ async def push_subscribe(
     body: SubscribeBody,
     session: Session = Depends(get_session),
 ) -> dict:
-    from app.push import subscribe
+    from backend.push import subscribe
 
     subscribe(session, body.endpoint, body.keys)
     return {"status": "ok"}
@@ -151,7 +151,7 @@ async def push_unsubscribe(
     body: SubscribeBody,
     session: Session = Depends(get_session),
 ) -> dict:
-    from app.push import unsubscribe
+    from backend.push import unsubscribe
 
     unsubscribe(session, body.endpoint)
     return {"status": "ok"}

@@ -3,7 +3,7 @@
 | 항목 | 기준 |
 |---|---|
 | 작성일 | 2026-11-18 (Asia/Seoul) |
-| 구현 기준 | `app/routes.py` 현재 소스 |
+| 구현 기준 | `src/backend/routes.py` 현재 소스 |
 | 데이터 형식 | JSON / UTF-8 |
 | 인증 | `/api/admin/refresh`만 Bearer 토큰, 나머지 공개 |
 | 문서 | `APP_ENV=debug`일 때 `/docs` (Swagger) 노출 |

@@ -6,8 +6,8 @@ from functools import lru_cache
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.config import Settings, get_settings
-from app.models import Base
+from backend.config import Settings, get_settings
+from backend.models import Base
 
 
 def make_engine(database_url: str):

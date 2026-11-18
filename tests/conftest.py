@@ -19,7 +19,7 @@ def db_session(tmp_path):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
-    from app.models import Base
+    from backend.models import Base
 
     engine = create_engine(f"sqlite:///{tmp_path}/test.db", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
@@ -32,7 +32,7 @@ def db_session(tmp_path):
 
 @pytest.fixture()
 def settings(tmp_path):
-    from app.config import Settings
+    from backend.config import Settings
 
     return Settings(
         app_env="debug",

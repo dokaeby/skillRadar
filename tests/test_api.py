@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.main import create_app
-from app.models import Base, Snapshot, SnapshotItem
+from backend.main import create_app
+from backend.models import Base, Snapshot, SnapshotItem
 
 
 @pytest.fixture()
@@ -20,11 +20,11 @@ def client(tmp_path, monkeypatch):
     factory = sessionmaker(bind=engine, expire_on_commit=False)
 
     # 스케줄러는 테스트에서 끈다
-    monkeypatch.setattr("app.main.start_scheduler", lambda *a, **k: None)
-    monkeypatch.setattr("app.main.stop_scheduler", lambda: None)
+    monkeypatch.setattr("backend.main.start_scheduler", lambda *a, **k: None)
+    monkeypatch.setattr("backend.main.stop_scheduler", lambda: None)
 
     settings = type("S", (), {})()  # placeholder replaced below
-    from app.config import Settings
+    from backend.config import Settings
 
     settings = Settings(
         app_env="debug",
@@ -39,7 +39,7 @@ def client(tmp_path, monkeypatch):
     app.state.session_factory = factory
 
     # get_session dependency를 테스트 팩토리로 교체
-    from app.db import get_session
+    from backend.db import get_session
 
     def override_get_session():
         s = factory()

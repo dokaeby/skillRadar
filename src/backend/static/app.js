@@ -40,10 +40,10 @@
     }
     // 다크모드 초기화 (localStorage 우선)
     const savedTheme = localStorage.getItem('sr-theme');
-    if (savedTheme === 'light')
-        document.documentElement.classList.remove('dark');
     if (savedTheme === 'dark')
         document.documentElement.classList.add('dark');
+    else
+        document.documentElement.classList.remove('dark');
     const isDark = () => document.documentElement.classList.contains('dark');
     syncThemeIcon();
     themeToggle.addEventListener('click', () => {

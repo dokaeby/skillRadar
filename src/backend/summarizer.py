@@ -267,8 +267,9 @@ class Summarizer:
                 if last:
                     return await fallback_summaries_async(description, full_name)
                 continue
-            # flash-lite가 ko를 \uXXXX로 출력하다 깨지는 경우가 많아
-            # ko는 깨끗한 en 라인을 Google 번역으로 생성한다.
-            normalized["ko"] = await translate_lines_ko(normalized["en"])
+            # flash-lite가 ko를 \uXXXX로 출력하다 깨지는 경우가 있어
+            # ko에 한글이 없으면 en 라인을 Google 번역으로 생성한다.
+            if not any("가" <= ch <= "힣" for line in normalized["ko"] for ch in line):
+                normalized["ko"] = await translate_lines_ko(normalized["en"])
             return normalized
         return await fallback_summaries_async(description, full_name)

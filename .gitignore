@@ -42,3 +42,4 @@ backups/
 # 로컬 로그
 *.log
 logs/
+skill-scan/logs/

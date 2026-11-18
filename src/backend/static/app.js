@@ -55,8 +55,10 @@
             b.classList.toggle('bg-white', active);
             b.classList.toggle('text-slate-900', active);
             b.classList.toggle('font-semibold', active);
-            b.classList.toggle('text-slate-400', !active);
-            b.classList.toggle('hover:text-slate-200', !active);
+            b.classList.toggle('text-slate-500', !active);
+            b.classList.toggle('dark:text-slate-400', !active);
+            b.classList.toggle('hover:text-slate-700', !active);
+            b.classList.toggle('dark:hover:text-slate-200', !active);
         });
     }
     langToggle.querySelectorAll('button').forEach((btn) => {
@@ -106,17 +108,17 @@
     }
     function renderCard(item) {
         const topics = (item.topics || []).slice(0, 4)
-            .map((t) => `<span class="topic-chip text-[10px] px-2 py-0.5 rounded-full bg-white/[.05] dark:bg-white/[.05] border border-white/[.07] dark:border-white/[.07] text-slate-400 dark:text-slate-400">${escapeHtml(t)}</span>`)
+            .map((t) => `<span class="topic-chip text-[10px] px-2 py-0.5 rounded-full bg-white/[.05] dark:bg-white/[.05] border border-white/[.07] dark:border-white/[.07] text-slate-500 dark:text-slate-400">${escapeHtml(t)}</span>`)
             .join('');
         const delta = item.stars_today;
         const deltaInner = delta === null || delta === undefined
-            ? '<span class="text-slate-500">—</span>'
+            ? '<span class="text-slate-500 dark:text-slate-500">—</span>'
             : delta > 0
                 ? `<span class="text-emerald-400 font-semibold inline-flex items-center gap-1">${ICON.trending}+${fmtStars(delta)}</span>`
-                : '<span class="text-slate-500">±0</span>';
-        const lines = (item.summary || []).map((l) => `<li class="flex gap-2.5"><span class="mt-[7px] w-1 h-1 rounded-full bg-slate-500/60 shrink-0"></span><span class="line-clamp-3">${escapeHtml(l)}</span></li>`).join('');
+                : '<span class="text-slate-500 dark:text-slate-500">±0</span>';
+        const lines = (item.summary || []).map((l) => `<li class="flex gap-2.5"><span class="mt-[7px] w-1 h-1 rounded-full bg-slate-400/70 dark:bg-slate-500/60 shrink-0"></span><span class="line-clamp-3">${escapeHtml(l)}</span></li>`).join('');
         const description = item.description
-            ? `<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mt-1">${escapeHtml(item.description)}</p>`
+            ? `<p class="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed mt-1">${escapeHtml(item.description)}</p>`
             : '';
         return `
     <article class="card fade-up rounded-2xl p-5 flex flex-col gap-3.5">
@@ -128,8 +130,8 @@
             ${escapeHtml(item.repo_full_name)}
           </a>
           ${description}
-          ${item.platform ? `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${PLATFORM_BADGE[item.platform] ?? 'text-slate-400'}"><span class="w-1.5 h-1.5 rounded-full ${PLATFORM_DOT[item.platform] ?? 'bg-slate-400'}"></span>${item.platform}</span>` : ''}
-          <div class="flex items-center gap-3 mt-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+          ${item.platform ? `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${PLATFORM_BADGE[item.platform] ?? 'text-slate-500'}"><span class="w-1.5 h-1.5 rounded-full ${PLATFORM_DOT[item.platform] ?? 'bg-slate-500'}"></span>${item.platform}</span>` : ''}
+          <div class="flex items-center gap-3 mt-2 text-xs text-slate-600 dark:text-slate-400 flex-wrap">
             ${item.language ? `<span class="px-2 py-0.5 rounded-md bg-white/[.05] dark:bg-white/[.05] border border-white/[.07] dark:border-white/[.07] font-medium">${escapeHtml(item.language)}</span>` : ''}
             <span class="inline-flex items-center gap-1">${ICON.star}<span class="font-medium text-slate-600 dark:text-slate-300">${fmtStars(item.stars)}</span></span>
             <span class="inline-flex items-center gap-1">오늘 ${deltaInner}</span>
@@ -147,7 +149,7 @@
     </article>`;
     }
     const PLATFORM_BADGE = {
-        claude: 'text-claude', chatgpt: 'text-chatgpt', gemini: 'text-gemini',
+        claude: 'text-[#b4552d] dark:text-claude', chatgpt: 'text-[#0b7a5c] dark:text-chatgpt', gemini: 'text-[#2b63d9] dark:text-gemini',
     };
     const PLATFORM_DOT = {
         claude: 'bg-claude', chatgpt: 'bg-chatgpt', gemini: 'bg-gemini',
@@ -176,7 +178,7 @@
                 return;
             }
             topicList.innerHTML = topics.map((t) => `
-        <button class="topic-btn shrink-0 lg:w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium text-slate-500 dark:text-slate-400 hover:bg-white/[.05] dark:hover:bg-white/[.05] hover:text-slate-200 transition-colors flex items-center justify-between gap-2"
+        <button class="topic-btn shrink-0 lg:w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[.05] dark:hover:bg-white/[.05] hover:text-slate-800 dark:hover:text-slate-200 transition-colors flex items-center justify-between gap-2"
                 data-topic="${escapeHtml(t.topic)}">
           <span class="truncate"># ${escapeHtml(t.topic)}</span>
           <span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-white/[.05] border border-white/[.08] text-slate-500 dark:text-slate-500">${t.count}</span>
@@ -196,8 +198,9 @@
     function markActiveTopic(topic) {
         topicList.querySelectorAll('.topic-btn').forEach((b) => {
             const active = b.dataset.topic === topic;
-            b.classList.toggle('bg-white/[.07]', active);
-            b.classList.toggle('text-slate-200', active);
+            b.classList.toggle('bg-slate-200/70', active);
+            b.classList.toggle('dark:bg-white/[.07]', active);
+            b.classList.toggle('text-slate-800', active);
             b.classList.toggle('dark:text-slate-200', active);
             b.classList.toggle('text-slate-500', !active);
             b.classList.toggle('dark:text-slate-400', !active);
@@ -224,9 +227,11 @@
     function syncTopicPlatformTabs() {
         topicPlatformTabs.querySelectorAll('button').forEach((b) => {
             const active = b.dataset.tplatform === state.topicPlatform;
-            b.classList.toggle('bg-white/[.08]', active);
-            b.classList.toggle('text-slate-200', active);
-            b.classList.toggle('text-slate-400', !active);
+            b.classList.toggle('bg-slate-200/70', active);
+            b.classList.toggle('dark:bg-white/[.08]', active);
+            b.classList.toggle('text-slate-800', active);
+            b.classList.toggle('dark:text-slate-200', active);
+            b.classList.toggle('text-slate-500', !active);
             b.classList.toggle('dark:text-slate-400', !active);
         });
     }

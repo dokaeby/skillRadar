@@ -10,6 +10,7 @@
     language: string | null;
     topics: string[];
     summary: string[];
+    platform?: string | null;
   }
   interface TrendingResponse {
     platform: string;
@@ -22,6 +23,9 @@
     lang: 'ko',
     date: '',
     dates: [] as string[],
+    topic: null as string | null,
+    topicPlatform: 'all',
+    topicCount: 0,
   };
 
   const grid = document.getElementById('grid') as HTMLElement;
@@ -33,6 +37,13 @@
   const themeIconMoon = document.getElementById('themeIconMoon') as HTMLElement;
   const langToggle = document.getElementById('langToggle') as HTMLElement;
   const platformTabs = document.getElementById('platformTabs') as HTMLElement;
+  const trendBar = document.getElementById('trendBar') as HTMLElement;
+  const topicList = document.getElementById('topicList') as HTMLElement;
+  const topicHeader = document.getElementById('topicHeader') as HTMLElement;
+  const topicTitle = document.getElementById('topicTitle') as HTMLElement;
+  const topicCount = document.getElementById('topicCount') as HTMLElement;
+  const topicBack = document.getElementById('topicBack') as HTMLElement;
+  const topicPlatformTabs = document.getElementById('topicPlatformTabs') as HTMLElement;
 
   const ICON = {
     star: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.2 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>',
@@ -147,6 +158,7 @@
             ${escapeHtml(item.repo_full_name)}
           </a>
           ${description}
+          ${item.platform ? `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${PLATFORM_BADGE[item.platform] ?? 'text-slate-400'}"><span class="w-1.5 h-1.5 rounded-full ${PLATFORM_DOT[item.platform] ?? 'bg-slate-400'}"></span>${item.platform}</span>` : ''}
           <div class="flex items-center gap-3 mt-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
             ${item.language ? `<span class="px-2 py-0.5 rounded-md bg-white/[.05] dark:bg-white/[.05] border border-white/[.07] dark:border-white/[.07] font-medium">${escapeHtml(item.language)}</span>` : ''}
             <span class="inline-flex items-center gap-1">${ICON.star}<span class="font-medium text-slate-600 dark:text-slate-300">${fmtStars(item.stars)}</span></span>
@@ -164,6 +176,123 @@
       </div>
     </article>`;
   }
+
+  const PLATFORM_BADGE: Record<string, string> = {
+    claude: 'text-claude', chatgpt: 'text-chatgpt', gemini: 'text-gemini',
+  };
+  const PLATFORM_DOT: Record<string, string> = {
+    claude: 'bg-claude', chatgpt: 'bg-chatgpt', gemini: 'bg-gemini',
+  };
+
+  function renderTopicRepos(data: TrendingResponse): void {
+    if (!data.items || !data.items.length) {
+      grid.innerHTML = '';
+      emptyTitle.textContent = '이 주제의 저장소가 없습니다';
+      emptyDesc.textContent = '다른 주제를 선택하거나 트렌딩으로 돌아가세요.';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    grid.innerHTML = data.items
+      .map((item, i) => renderCard({ ...item, rank: i + 1 }))
+      .join('');
+    updatedAt.textContent = '';
+  }
+
+  async function loadTopics(): Promise<void> {
+    try {
+      const res = await fetch('/api/topics');
+      const data = (await res.json()) as { topics?: { topic: string; count: number }[] };
+      const topics = data.topics ?? [];
+      if (!topics.length) {
+        topicList.innerHTML = '<p class="text-xs text-slate-500 px-2 py-3">주제 데이터가 없습니다</p>';
+        return;
+      }
+      topicList.innerHTML = topics.map((t) => `
+        <button class="topic-btn shrink-0 lg:w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium text-slate-500 dark:text-slate-400 hover:bg-white/[.05] dark:hover:bg-white/[.05] hover:text-slate-200 transition-colors flex items-center justify-between gap-2"
+                data-topic="${escapeHtml(t.topic)}">
+          <span class="truncate"># ${escapeHtml(t.topic)}</span>
+          <span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-white/[.05] border border-white/[.08] text-slate-500 dark:text-slate-500">${t.count}</span>
+        </button>`).join('');
+      topicList.querySelectorAll<HTMLButtonElement>('.topic-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const topic = btn.dataset.topic ?? '';
+          const count = Number(btn.querySelector('span:last-child')?.textContent ?? 0);
+          selectTopic(topic, count);
+        });
+      });
+    } catch {
+      topicList.innerHTML = '<p class="text-xs text-slate-500 px-2 py-3">주제를 불러오지 못했습니다</p>';
+    }
+  }
+
+  function markActiveTopic(topic: string | null): void {
+    topicList.querySelectorAll<HTMLButtonElement>('.topic-btn').forEach((b) => {
+      const active = b.dataset.topic === topic;
+      b.classList.toggle('bg-white/[.07]', active);
+      b.classList.toggle('text-slate-200', active);
+      b.classList.toggle('dark:text-slate-200', active);
+      b.classList.toggle('text-slate-500', !active);
+      b.classList.toggle('dark:text-slate-400', !active);
+    });
+  }
+
+  function selectTopic(topic: string, count: number): void {
+    state.topic = topic;
+    state.topicPlatform = 'all';
+    markActiveTopic(topic);
+    topicTitle.textContent = `#${topic}`;
+    topicCount.textContent = `최근 30일 ${count}개 저장소`;
+    topicHeader.classList.remove('hidden');
+    trendBar.classList.add('hidden');
+    syncTopicPlatformTabs();
+    void loadTopicRepos();
+  }
+
+  function clearTopic(): void {
+    state.topic = null;
+    markActiveTopic(null);
+    topicHeader.classList.add('hidden');
+    trendBar.classList.remove('hidden');
+    void loadTrending();
+  }
+
+  function syncTopicPlatformTabs(): void {
+    topicPlatformTabs.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+      const active = b.dataset.tplatform === state.topicPlatform;
+      b.classList.toggle('bg-white/[.08]', active);
+      b.classList.toggle('text-slate-200', active);
+      b.classList.toggle('text-slate-400', !active);
+      b.classList.toggle('dark:text-slate-400', !active);
+    });
+  }
+
+  async function loadTopicRepos(): Promise<void> {
+    if (!state.topic) return;
+    skeletons();
+    try {
+      const params = new URLSearchParams({
+        topic: state.topic, platform: state.topicPlatform, lang: state.lang, limit: '10',
+      });
+      const res = await fetch(`/api/topic-repos?${params.toString()}`);
+      const data = (await res.json()) as TrendingResponse;
+      renderTopicRepos(data);
+    } catch {
+      grid.innerHTML = '<p class="col-span-full text-center text-red-500 py-10">데이터를 불러오지 못했습니다.</p>';
+    }
+  }
+
+  topicBack.addEventListener('click', clearTopic);
+  topicPlatformTabs.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.topicPlatform = btn.dataset.tplatform ?? 'all';
+      syncTopicPlatformTabs();
+      void loadTopicRepos();
+    });
+  });
+
+  const emptyTitle = document.getElementById('emptyTitle') as HTMLElement;
+  const emptyDesc = document.getElementById('emptyDesc') as HTMLElement;
 
   async function loadDates(): Promise<void> {
     try {
@@ -202,5 +331,7 @@
     }
   }
 
+  syncTopicPlatformTabs();
+  void loadTopics();
   void loadDates().then(loadTrending);
 })();

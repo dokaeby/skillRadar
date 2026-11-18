@@ -2,7 +2,8 @@
 
 import hmac
 import logging
-from datetime import date as date_type
+from collections import Counter
+from datetime import date as date_type, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -14,7 +15,7 @@ from sqlalchemy.orm import Session
 from backend.config import PLATFORMS, Settings, get_settings
 from backend.db import get_session
 from backend.github_client import today_kst
-from backend.models import Snapshot
+from backend.models import Snapshot, SnapshotItem
 from backend.scheduler import run_daily_collect
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class TrendingItem(BaseModel):
     language: str | None
     topics: list[str]
     summary: list[str]
+    platform: str | None = None
 
 
 class TrendingResponse(BaseModel):
@@ -45,7 +47,7 @@ class SubscribeBody(BaseModel):
     keys: dict[str, str]
 
 
-def _serialize_item(item, lang: str) -> TrendingItem:
+def _serialize_item(item, lang: str, platform: str | None = None) -> TrendingItem:
     return TrendingItem(
         rank=item.rank,
         repo_full_name=item.repo_full_name,
@@ -56,6 +58,7 @@ def _serialize_item(item, lang: str) -> TrendingItem:
         language=item.language,
         topics=item.topics or [],
         summary=item.summary_for(lang),
+        platform=platform,
     )
 
 
@@ -115,6 +118,73 @@ async def available_dates(
         .limit(30)
     ).scalars().all()
     return {"dates": [d.isoformat() for d in rows]}
+
+
+TOPIC_WINDOW_DAYS = 30
+TOPIC_MAX_RESULTS = 50
+
+
+def _recent_items(session: Session):
+    """최근 TOPIC_WINDOW_DAYS일 스냅샷의 (item, platform) 목록."""
+    since = date_type.today() - timedelta(days=TOPIC_WINDOW_DAYS)
+    return session.execute(
+        select(SnapshotItem, Snapshot.platform)
+        .join(Snapshot, SnapshotItem.snapshot_id == Snapshot.id)
+        .where(Snapshot.collected_date >= since)
+    ).all()
+
+
+@router.get("/api/topics")
+async def topics(session: Session = Depends(get_session)) -> dict:
+    """최근 수집분에서 등장 횟수가 많은 GitHub 토픽을 관심순으로 반환."""
+    counts: Counter[str] = Counter()
+    for item, _platform in _recent_items(session):
+        for topic in set(item.topics or []):
+            counts[topic] += 1
+    return {
+        "topics": [
+            {"topic": t, "count": c}
+            for t, c in counts.most_common(TOPIC_MAX_RESULTS)
+        ]
+    }
+
+
+@router.get("/api/topic-repos")
+async def topic_repos(
+    topic: str,
+    platform: str = "all",
+    lang: str = "ko",
+    limit: int = 10,
+    session: Session = Depends(get_session),
+) -> TrendingResponse:
+    """특정 토픽을 가진 저장소를 스타 순으로 반환 (플랫폼별 필터 가능)."""
+    if not topic or len(topic) > 100:
+        raise HTTPException(status_code=400, detail="topic 파라미터가 필요합니다")
+    if platform != "all" and platform not in PLATFORMS:
+        raise HTTPException(status_code=400, detail="platform은 all|claude|chatgpt|gemini")
+    if lang not in ("ko", "en", "zh"):
+        raise HTTPException(status_code=400, detail="lang은 ko|en|zh 중 하나")
+    limit = max(1, min(limit, 50))
+
+    best: dict[str, tuple[SnapshotItem, str]] = {}
+    for item, plat in _recent_items(session):
+        if topic not in (item.topics or []):
+            continue
+        if platform != "all" and plat != platform:
+            continue
+        prev = best.get(item.repo_full_name)
+        if prev is None or item.stars > prev[0].stars:
+            best[item.repo_full_name] = (item, plat)
+
+    ranked = sorted(best.values(), key=lambda pair: pair[0].stars, reverse=True)[:limit]
+    return TrendingResponse(
+        platform=platform,
+        date=date_type.today().isoformat(),
+        items=[
+            _serialize_item(item, lang, platform=plat)
+            for item, plat in ranked
+        ],
+    )
 
 
 @router.post("/api/admin/refresh")

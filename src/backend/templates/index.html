@@ -118,7 +118,7 @@ tailwind.config = {
 
 <!-- 헤더 -->
 <header class="sticky top-0 z-20 backdrop-blur-xl bg-[#07090f]/70 dark:bg-[#07090f]/70 border-b border-white/[.06]">
-  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
     <div class="flex items-center gap-2.5 mr-auto">
       <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-claude via-chatgpt to-gemini flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-black/30 ring-1 ring-white/20">SR</div>
       <div>
@@ -148,7 +148,7 @@ tailwind.config = {
   </div>
 
   <!-- 플랫폼 탭 + 날짜 -->
-  <div class="max-w-6xl mx-auto px-4 pb-3 flex items-center gap-5 flex-wrap">
+  <div id="trendBar" class="max-w-7xl mx-auto px-4 pb-3 flex items-center gap-5 flex-wrap">
     <nav class="flex gap-1 text-sm font-semibold" id="platformTabs">
       <button data-platform="claude" class="px-3 py-1.5 rounded-md text-claude tab-active">Claude</button>
       <button data-platform="chatgpt" class="px-3 py-1.5 rounded-md text-chatgpt">ChatGPT</button>
@@ -161,16 +161,55 @@ tailwind.config = {
   </div>
 </header>
 
-<main class="max-w-6xl mx-auto px-4 py-6">
-  <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
-  <div id="empty" class="hidden text-center py-24">
-    <div class="w-14 h-14 mx-auto rounded-2xl bg-white/[.04] border border-white/10 flex items-center justify-center text-2xl mb-4">📡</div>
-    <p class="text-base font-semibold text-slate-300 dark:text-slate-300">아직 수집된 데이터가 없습니다</p>
-    <p class="text-sm mt-1.5 text-slate-500 dark:text-slate-500">매일 KST 06:00 자동 수집되거나, 관리자가 /api/admin/refresh를 호출하세요.</p>
-  </div>
-</main>
+<div class="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
 
-<footer class="max-w-6xl mx-auto px-4 pb-8 text-[11px] text-slate-500 dark:text-slate-600 flex justify-between flex-wrap gap-2">
+  <!-- 주제 사이드바 -->
+  <aside class="lg:w-60 shrink-0">
+    <div class="lg:sticky lg:top-[104px]">
+      <div class="flex items-center justify-between mb-2 px-1">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">관심 주제</h2>
+        <span class="text-[10px] text-slate-500 dark:text-slate-600">최근 30일</span>
+      </div>
+      <div id="topicList" class="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 -mx-1 px-1">
+        <div class="skeleton h-8 w-32 lg:w-full rounded-lg shrink-0"></div>
+        <div class="skeleton h-8 w-28 lg:w-full rounded-lg shrink-0"></div>
+        <div class="skeleton h-8 w-36 lg:w-full rounded-lg shrink-0"></div>
+        <div class="skeleton h-8 w-24 lg:w-full rounded-lg shrink-0"></div>
+        <div class="skeleton h-8 w-32 lg:w-full rounded-lg shrink-0"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 메인 -->
+  <main class="flex-1 min-w-0">
+    <!-- 주제 상세 헤더 (선택 시 표시) -->
+    <div id="topicHeader" class="hidden mb-4">
+      <button id="topicBack" class="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-200 mb-2 inline-flex items-center gap-1 transition-colors">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        트렌딩으로 돌아가기
+      </button>
+      <div class="flex items-center gap-3 flex-wrap">
+        <h2 id="topicTitle" class="text-lg font-bold tracking-tight"></h2>
+        <span id="topicCount" class="text-[11px] px-2 py-0.5 rounded-full bg-white/[.06] border border-white/10 text-slate-400"></span>
+      </div>
+      <div id="topicPlatformTabs" class="flex gap-1 mt-3 text-xs font-semibold">
+        <button data-tplatform="all" class="px-3 py-1.5 rounded-md bg-white/[.08] text-slate-200">전체</button>
+        <button data-tplatform="claude" class="px-3 py-1.5 rounded-md text-claude">Claude</button>
+        <button data-tplatform="chatgpt" class="px-3 py-1.5 rounded-md text-chatgpt">ChatGPT</button>
+        <button data-tplatform="gemini" class="px-3 py-1.5 rounded-md text-gemini">Gemini</button>
+      </div>
+    </div>
+
+    <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    <div id="empty" class="hidden text-center py-24">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-white/[.04] border border-white/10 flex items-center justify-center text-2xl mb-4">📡</div>
+      <p class="text-base font-semibold text-slate-300 dark:text-slate-300" id="emptyTitle">아직 수집된 데이터가 없습니다</p>
+      <p class="text-sm mt-1.5 text-slate-500 dark:text-slate-500" id="emptyDesc">매일 KST 06:00 자동 수집되거나, 관리자가 /api/admin/refresh를 호출하세요.</p>
+    </div>
+  </main>
+</div>
+
+<footer class="max-w-7xl mx-auto px-4 pb-8 text-[11px] text-slate-500 dark:text-slate-600 flex justify-between flex-wrap gap-2">
   <span>GitHub Search API · 일일 Top 10 · LLM 3줄 요약</span>
   <span id="updatedAt"></span>
 </footer>

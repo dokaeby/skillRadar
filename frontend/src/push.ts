@@ -2,11 +2,33 @@
 (() => {
   const btn = document.getElementById('pushBtn') as HTMLButtonElement | null;
   if (!btn) return;
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    btn.style.display = 'none';
-    return;
-  }
   const pushBtn: HTMLButtonElement = btn;
+
+  const pushSupported =
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    'Notification' in window;
+
+  function isIos(): boolean {
+    const ua = navigator.userAgent;
+    return (
+      /iphone|ipad|ipod/i.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+  }
+
+  function showUnsupportedGuide(): void {
+    if (isIos()) {
+      alert(
+        '아이폰에서는 홈 화면에 추가한 앱에서만 알림을 받을 수 있습니다.\n\n' +
+          '1. Safari 공유 버튼(□↑) 탭\n' +
+          '2. "홈 화면에 추가" 선택\n' +
+          '3. 홈 화면의 SkillRadar를 실행한 뒤 다시 눌러주세요.'
+      );
+    } else {
+      alert('이 브라우저는 웹 푸시를 지원하지 않습니다. Chrome을 사용해주세요.');
+    }
+  }
 
   function urlBase64ToUint8Array(base64: string): Uint8Array {
     const padding = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -34,6 +56,10 @@
   pushBtn.addEventListener('click', () => {
     void (async () => {
       try {
+        if (!pushSupported) {
+          showUnsupportedGuide();
+          return;
+        }
         const sub = await currentSub();
         if (sub) {
           await fetch('/api/push/unsubscribe', {
@@ -70,7 +96,7 @@
     })();
   });
 
-  if ('serviceWorker' in navigator) {
+  if (pushSupported) {
     navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     navigator.serviceWorker.ready.then(refreshBtn).catch(() => undefined);
   }

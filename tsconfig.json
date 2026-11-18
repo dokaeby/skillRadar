@@ -6,7 +6,7 @@
     "strict": true,
     "noEmitOnError": true,
     "skipLibCheck": true,
-    "outDir": "app/static",
+    "outDir": "src/backend/static",
     "rootDir": "frontend/src"
   },
   "include": ["frontend/src/app.ts", "frontend/src/push.ts"]

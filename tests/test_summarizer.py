@@ -48,7 +48,7 @@ async def test_summarize_returns_three_langs():
     result = await sm.summarize("claude", "a/b", "desc", "readme")
     assert result["en"][0] == "Does X for Y."
     assert result["zh"][1] == "通过Z使用。"
-    assert result["ko"][2] == "[ko]Built for devs."
+    assert result["ko"][2] == "개발자 대상."
 
 
 @pytest.mark.asyncio

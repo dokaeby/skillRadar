@@ -42,15 +42,12 @@
     return reg.pushManager.getSubscription();
   }
 
+  const pushBtnLabel = document.getElementById('pushBtnLabel') as HTMLElement | null;
+
   async function refreshBtn(): Promise<void> {
     const sub = await currentSub().catch(() => null);
-    if (sub) {
-      pushBtn.textContent = '🔔 알림 중';
-      pushBtn.classList.add('subscribed');
-    } else {
-      pushBtn.textContent = '🔔 알림 받기';
-      pushBtn.classList.remove('subscribed');
-    }
+    if (pushBtnLabel) pushBtnLabel.textContent = sub ? '알림 중' : '알림 받기';
+    pushBtn.classList.toggle('subscribed', !!sub);
   }
 
   pushBtn.addEventListener('click', () => {

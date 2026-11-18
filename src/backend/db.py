@@ -18,7 +18,15 @@ def make_engine(database_url: str):
     elif url.startswith("postgresql://"):
         url = "postgresql+psycopg://" + url[len("postgresql://") :]
     connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    return create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+    # 서버리스 환경에서 인스턴스 수만큼 엔진이 생기므로 Postgres는 커넥션 풀을 작게 유지한다.
+    pool_kwargs = (
+        {"pool_size": 2, "max_overflow": 3, "pool_recycle": 300}
+        if url.startswith("postgres")
+        else {}
+    )
+    return create_engine(
+        url, connect_args=connect_args, pool_pre_ping=True, **pool_kwargs
+    )
 
 
 @lru_cache

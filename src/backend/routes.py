@@ -1,5 +1,6 @@
 """API + 서버 렌더링 라우트."""
 
+import hmac
 import logging
 from datetime import date as date_type
 from pathlib import Path
@@ -128,7 +129,7 @@ async def admin_refresh(
     if authorization and authorization.startswith("Bearer "):
         token = authorization[7:]
     expected = settings.admin_token.get_secret_value()
-    if not expected or token != expected:
+    if not expected or not hmac.compare_digest(token, expected):
         raise HTTPException(status_code=401, detail="unauthorized")
 
     await run_daily_collect(request.app.state.session_factory, settings)

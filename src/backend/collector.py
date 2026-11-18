@@ -15,6 +15,7 @@ from backend.summarizer import (
     content_hash,
     fallback_summaries,
     fallback_summaries_async,
+    sanitize_readme,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,13 +54,23 @@ async def collect_platform(
         # 1) 플랫폼 쿼리들을 합쳐 중복 제거 후 star 순 Top N 선정
         queries = settings.platform_queries().get(platform, [])
         merged: dict[str, RepoHit] = {}
+        skipped = {"archived": 0, "fork": 0}
         for q in queries:
             for hit in await gh.search_repositories(q):
-                if hit.archived or hit.fork:
+                if hit.archived:
+                    skipped["archived"] += 1
+                    continue
+                if hit.fork:
+                    skipped["fork"] += 1
                     continue
                 prev = merged.get(hit.full_name)
                 if prev is None or hit.stars > prev.stars:
                     merged[hit.full_name] = hit
+        if skipped["archived"] or skipped["fork"]:
+            logger.info(
+                "%s dedupe_filter: archived %d, fork %d 제외",
+                platform, skipped["archived"], skipped["fork"],
+            )
         ranked = sorted(merged.values(), key=lambda h: h.stars, reverse=True)[:TOP_N]
 
         # 2) 직전 스냅샷의 star 수 (오늘 증가량 계산용)
@@ -92,7 +103,8 @@ async def collect_platform(
 
         async def process(idx: int, hit: RepoHit) -> SnapshotItem:
             async with sem:
-                readme = await gh.fetch_readme(hit.full_name)
+                raw_readme = await gh.fetch_readme(hit.full_name)
+            readme = sanitize_readme(raw_readme)
             chash = content_hash(hit.description, readme)
             cached = _find_cached_summary(session, hit.full_name, chash)
             if cached:

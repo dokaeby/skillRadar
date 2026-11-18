@@ -7,6 +7,7 @@ import logging
 import re
 
 import httpx
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,33 @@ def content_hash(description: str | None, readme: str | None) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+class LLMSummary(BaseModel):
+    """LLM 구조화 출력 스키마. 언어별 정확히 3줄."""
+
+    summary_en: list[str] = Field(min_length=3, max_length=3)
+    summary_zh: list[str] = Field(min_length=3, max_length=3)
+    summary_ko: list[str] = Field(min_length=3, max_length=3)
+
+
+_INJECTION_RE = re.compile(
+    r"ignore\s+(all|any|previous|above)\s+instructions|system\s+prompt|"
+    r"you\s+are\s+now|do\s+not\s+follow|disregard\s+(all|any|previous)",
+    re.IGNORECASE,
+)
+
+
+def sanitize_readme(text: str | None, max_chars: int = 3000) -> str:
+    """README를 LLM 입력용으로 정제한다.
+
+    저장소 콘텐츠는 신뢰할 수 없는 입력이므로 프롬프트 인젝션 의심 문구가
+    포함된 줄을 제거하고 길이를 제한한다.
+    """
+    if not text:
+        return ""
+    kept = [line for line in text.splitlines() if not _INJECTION_RE.search(line)]
+    return "\n".join(kept)[:max_chars]
+
+
 def _normalize(data: dict, description: str | None) -> dict[str, list[str]] | None:
     """LLM 응답을 {en, zh, ko: [3줄]} 형태로 정규화. ko 없으면 en을 번역 대체로 사용."""
     out: dict[str, list[str]] = {}
@@ -95,7 +123,21 @@ def _normalize(data: dict, description: str | None) -> dict[str, list[str]] | No
         if len(cleaned) != 3:
             return None
         out[key] = cleaned
-    return out
+    try:
+        validated = LLMSummary.model_validate(
+            {
+                "summary_en": out["en"],
+                "summary_zh": out["zh"],
+                "summary_ko": out["ko"],
+            }
+        )
+    except Exception:
+        return None
+    return {
+        "en": validated.summary_en,
+        "zh": validated.summary_zh,
+        "ko": validated.summary_ko,
+    }
 
 
 def fallback_summaries(description: str | None, full_name: str) -> dict[str, list[str]]:

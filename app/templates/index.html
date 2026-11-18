@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b0f17">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SkillRadar">
+<title>SkillRadar — AI Tooling Trending</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23d97757'/><stop offset='.5' stop-color='%2310a37f'/><stop offset='1' stop-color='%234285f4'/></linearGradient></defs><rect width='100' height='100' rx='22' fill='url(%23g)'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>SR</text></svg>">
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: { extend: {
+    fontFamily: { sans: ['Pretendard Variable','Pretendard','system-ui','sans-serif'] },
+    colors: {
+      claude: '#d97757', chatgpt: '#10a37f', gemini: '#4285f4',
+    }
+  }}
+}
+</script>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: 'Pretendard Variable','Pretendard',system-ui,sans-serif; }
+  .card { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .card:hover { transform: translateY(-2px); }
+  .rank-badge {
+    background: linear-gradient(135deg, rgba(217,119,87,.18), rgba(66,133,244,.18));
+  }
+  .tab-active { box-shadow: inset 0 -2px 0 currentColor; }
+  .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:box-orient:vertical; overflow:hidden; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px);} to {opacity:1; transform:none;} }
+  .fade-up { animation: fadeUp .35s ease both; }
+  .skeleton { background: linear-gradient(90deg, rgba(148,163,184,.12) 25%, rgba(148,163,184,.22) 50%, rgba(148,163,184,.12) 75%); background-size:200% 100%; animation: shimmer 1.2s infinite; }
+  @keyframes shimmer { to { background-position:-200% 0; } }
+  .push-btn { transition: all .15s ease; }
+  .push-btn.subscribed { opacity:.55; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-[#0b0f17] dark:text-slate-200 min-h-screen antialiased">
+
+<!-- 헤더 -->
+<header class="sticky top-0 z-20 backdrop-blur-md bg-white/80 dark:bg-[#0b0f17]/80 border-b border-slate-200 dark:border-slate-800">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
+    <div class="flex items-center gap-2 mr-auto">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-claude via-chatgpt to-gemini flex items-center justify-center text-white font-bold text-sm">SR</div>
+      <div>
+        <h1 class="font-bold text-lg leading-tight">SkillRadar</h1>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">AI skill · plugin trending</p>
+      </div>
+    </div>
+
+    <!-- 언어 토글 -->
+    <div class="flex rounded-lg border border-slate-300 dark:border-slate-700 overflow-hidden text-xs font-medium" id="langToggle">
+      <button data-lang="ko" class="px-3 py-1.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900">한글</button>
+      <button data-lang="en" class="px-3 py-1.5 text-slate-500 dark:text-slate-400">EN</button>
+      <button data-lang="zh" class="px-3 py-1.5 text-slate-500 dark:text-slate-400">中文</button>
+    </div>
+
+    <!-- 다크모드 -->
+    <button id="themeToggle" class="p-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" title="테마 전환">🌙</button>
+
+    <!-- 푸시 구독 -->
+    <button id="pushBtn" class="push-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10">🔔 알림 받기</button>
+  </div>
+
+  <!-- 플랫폼 탭 + 날짜 -->
+  <div class="max-w-6xl mx-auto px-4 pb-3 flex items-center gap-4 flex-wrap">
+    <nav class="flex gap-1 text-sm font-semibold" id="platformTabs">
+      <button data-platform="claude" class="px-3 py-1.5 rounded-md text-claude tab-active">Claude</button>
+      <button data-platform="chatgpt" class="px-3 py-1.5 rounded-md text-chatgpt">ChatGPT</button>
+      <button data-platform="gemini" class="px-3 py-1.5 rounded-md text-gemini">Gemini</button>
+    </nav>
+    <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 ml-auto">
+      <span>기준일</span>
+      <select id="dateSelect" class="bg-transparent border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-xs"></select>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6">
+  <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+  <div id="empty" class="hidden text-center py-20 text-slate-400">
+    <p class="text-lg font-medium">아직 수집된 데이터가 없습니다</p>
+    <p class="text-sm mt-1">매일 KST 06:00 자동 수집되거나, 관리자가 /api/admin/refresh를 호출하세요.</p>
+  </div>
+</main>
+
+<footer class="max-w-6xl mx-auto px-4 pb-8 text-[11px] text-slate-400 flex justify-between">
+  <span>GitHub Search API · 일일 Top 10 · LLM 3줄 요약</span>
+  <span id="updatedAt"></span>
+</footer>
+
+<script src="/static/app.js" defer></script>
+<script src="/static/push.js" defer></script>
+</body>
+</html>

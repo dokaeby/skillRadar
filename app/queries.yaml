@@ -1,0 +1,12 @@
+claude:
+  - "topic:claude-skills archived:false fork:false"
+  - "topic:claude-code-plugin archived:false fork:false"
+  - '"claude skill" in:name,description,readme archived:false fork:false'
+chatgpt:
+  - "topic:chatgpt-plugin archived:false fork:false"
+  - "topic:custom-gpt archived:false fork:false"
+  - '"chatgpt plugin" in:name,description archived:false fork:false'
+gemini:
+  - "topic:gemini-extension archived:false fork:false"
+  - "topic:gemini-cli-extension archived:false fork:false"
+  - '"gemini extension" in:name,description archived:false fork:false'

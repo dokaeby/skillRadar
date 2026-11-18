@@ -1,0 +1,10 @@
+{
+  "name": "skillradar-frontend",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.sw.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

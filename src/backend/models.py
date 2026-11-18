@@ -7,6 +7,7 @@ from sqlalchemy import (
     JSON,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -60,6 +61,10 @@ class SnapshotItem(Base):
     summary_en: Mapped[list[str] | None] = mapped_column(JSON)
     summary_zh: Mapped[list[str] | None] = mapped_column(JSON)
     summary_ko: Mapped[list[str] | None] = mapped_column(JSON)
+    taxonomy: Mapped[str | None] = mapped_column(String(50))
+    taxonomy_confidence: Mapped[float | None] = mapped_column(Float)
+    rank_score: Mapped[float | None] = mapped_column(Float)
+    summary_status: Mapped[str] = mapped_column(String(20), nullable=False, default="ok")
     content_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()

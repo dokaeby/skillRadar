@@ -34,6 +34,9 @@ class TrendingItem(BaseModel):
     topics: list[str]
     summary: list[str]
     platform: str | None = None
+    taxonomy: str | None = None
+    rank_score: float | None = None
+    summary_status: str | None = None
 
 
 class TrendingResponse(BaseModel):
@@ -59,6 +62,9 @@ def _serialize_item(item, lang: str, platform: str | None = None) -> TrendingIte
         topics=item.topics or [],
         summary=item.summary_for(lang),
         platform=platform,
+        taxonomy=item.taxonomy,
+        rank_score=item.rank_score,
+        summary_status=item.summary_status,
     )
 
 
@@ -176,7 +182,14 @@ async def topic_repos(
         if prev is None or item.stars > prev[0].stars:
             best[item.repo_full_name] = (item, plat)
 
-    ranked = sorted(best.values(), key=lambda pair: pair[0].stars, reverse=True)[:limit]
+    ranked = sorted(
+        best.values(),
+        key=lambda pair: (
+            pair[0].rank_score if pair[0].rank_score is not None else float("-inf"),
+            pair[0].stars,
+        ),
+        reverse=True,
+    )[:limit]
     return TrendingResponse(
         platform=platform,
         date=date_type.today().isoformat(),
@@ -185,6 +198,27 @@ async def topic_repos(
             for item, plat in ranked
         ],
     )
+
+
+@router.get("/api/related-topics")
+async def related_topics(
+    topic: str,
+    session: Session = Depends(get_session),
+) -> dict:
+    """특정 토픽과 함께 등장한 다른 토픽을 공기반 점수 순으로 반환."""
+    if not topic or len(topic) > 100:
+        raise HTTPException(status_code=400, detail="topic 파라미터가 필요합니다")
+    co: Counter[str] = Counter()
+    for item, _platform in _recent_items(session):
+        topics = set(item.topics or [])
+        if topic not in topics:
+            continue
+        for other in topics - {topic}:
+            co[other] += 1
+    return {
+        "topic": topic,
+        "related": [{"topic": t, "score": c} for t, c in co.most_common(10)],
+    }
 
 
 @router.post("/api/admin/refresh")

@@ -8,6 +8,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.main import create_app
+from pydantic import SecretStr
+
+from backend.config import Settings
 from backend.models import Base, Snapshot, SnapshotItem
 
 
@@ -24,16 +27,14 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr("backend.main.stop_scheduler", lambda: None)
 
     settings = type("S", (), {})()  # placeholder replaced below
-    from backend.config import Settings
-
     settings = Settings(
         app_env="debug",
         database_url=f"sqlite:///{tmp_path}/api.db",
-        admin_token="secret-admin",
-        github_token="",
-        llm_api_key="",
+        admin_token=SecretStr("secret-admin"),
+        github_token=SecretStr(""),
+        llm_api_key=SecretStr(""),
         vapid_public_key="",
-        vapid_private_key="",
+        vapid_private_key=SecretStr(""),
     )
     app = create_app(settings)
     app.state.session_factory = factory

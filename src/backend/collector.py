@@ -1,4 +1,4 @@
-"""수집 파이프라인: GitHub 검색 → dedupe → README → LLM 요약 → DB 저장."""
+"""수집 파이프라인: LangGraph 큐레이터 실행 → 스냅샷 저장."""
 
 import asyncio
 import logging
@@ -10,13 +10,9 @@ from sqlalchemy.orm import Session
 from backend.config import Settings
 from backend.github_client import GitHubClient, RepoHit, stars_delta, today_kst
 from backend.models import Snapshot, SnapshotItem
-from backend.summarizer import (
-    Summarizer,
-    content_hash,
-    fallback_summaries,
-    fallback_summaries_async,
-    sanitize_readme,
-)
+from backend.graph.pipeline import run_platform_pipeline
+from backend.schemas import GitHubLike, SummarizerLike
+from backend.summarizer import Summarizer, content_hash
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +24,8 @@ async def collect_platform(
     platform: str,
     session: Session,
     settings: Settings,
-    github: GitHubClient | None = None,
-    summarizer: Summarizer | None = None,
+    github: GitHubLike | None = None,
+    summarizer: SummarizerLike | None = None,
     collected_date: date | None = None,
 ) -> Snapshot:
     """플랫폼 하나를 수집해 스냅샷으로 저장한다.
@@ -51,27 +47,23 @@ async def collect_platform(
     own_gh = github is None
     own_sm = summarizer is None and sm is not None
     try:
-        # 1) 플랫폼 쿼리들을 합쳐 중복 제거 후 star 순 Top N 선정
+        # 1) LangGraph 큐레이터 파이프라인 실행 (collect→dedupe→sanitize→classify→summarize→verify→rank)
         queries = settings.platform_queries().get(platform, [])
-        merged: dict[str, RepoHit] = {}
-        skipped = {"archived": 0, "fork": 0}
-        for q in queries:
-            for hit in await gh.search_repositories(q):
-                if hit.archived:
-                    skipped["archived"] += 1
-                    continue
-                if hit.fork:
-                    skipped["fork"] += 1
-                    continue
-                prev = merged.get(hit.full_name)
-                if prev is None or hit.stars > prev.stars:
-                    merged[hit.full_name] = hit
-        if skipped["archived"] or skipped["fork"]:
-            logger.info(
-                "%s dedupe_filter: archived %d, fork %d 제외",
-                platform, skipped["archived"], skipped["fork"],
+
+        async def _cache_lookup(full_name: str, description: str | None, readme: str):
+            hit = _find_cached_summary(
+                session, full_name, content_hash(description, readme)
             )
-        ranked = sorted(merged.values(), key=lambda h: h.stars, reverse=True)[:TOP_N]
+            if hit is None:
+                return None
+            en, zh, ko = hit
+            return {"en": en, "zh": zh, "ko": ko}
+
+        state = await run_platform_pipeline(
+            platform, queries, settings, github=gh, summarizer=sm,
+            summary_cache=_cache_lookup,
+        )
+        ranked_repos = state.ranked
 
         # 2) 직전 스냅샷의 star 수 (오늘 증가량 계산용)
         collected = collected_date or date.fromisoformat(today_kst())
@@ -91,53 +83,39 @@ async def collect_platform(
         session.add(snapshot)
         session.flush()
 
-        # 4) README + 요약 (항목별 독립 처리, 동시성 제한)
-        sem = asyncio.Semaphore(README_CONCURRENCY)
-
-        async def fallback_for(hit: RepoHit) -> tuple[list[str], list[str], list[str]]:
-            if settings.translate_fallback:
-                fb = await fallback_summaries_async(hit.description, hit.full_name)
-            else:
-                fb = fallback_summaries(hit.description, hit.full_name)
-            return fb["en"], fb["zh"], fb["ko"]
-
-        async def process(idx: int, hit: RepoHit) -> SnapshotItem:
-            async with sem:
-                raw_readme = await gh.fetch_readme(hit.full_name)
-            readme = sanitize_readme(raw_readme)
-            chash = content_hash(hit.description, readme)
+        # 4) 요약 캐시 확인 후 SnapshotItem 생성
+        items: list[SnapshotItem] = []
+        for idx, rr in enumerate(ranked_repos):
+            hit = rr.clean.repo
+            summ = rr.summary
+            chash = content_hash(hit.description, rr.clean.sanitized_readme)
             cached = _find_cached_summary(session, hit.full_name, chash)
             if cached:
                 en, zh, ko = cached
-            elif sm is not None:
-                try:
-                    result = await sm.summarize(
-                            platform, hit.full_name, hit.description, readme
-                        )
-                    en, zh, ko = result["en"], result["zh"], result["ko"]
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("요약 실패 %s: %s", hit.full_name, exc)
-                    en, zh, ko = await fallback_for(hit)
             else:
-                en, zh, ko = await fallback_for(hit)
-            return SnapshotItem(
-                snapshot_id=snapshot.id,
-                rank=idx + 1,
-                repo_full_name=hit.full_name,
-                repo_url=hit.html_url,
-                description=hit.description,
-                stars=hit.stars,
-                language=hit.language,
-                topics=hit.topics,
-                readme_excerpt=readme[:3000] or None,
-                summary_en=en,
-                summary_zh=zh,
-                summary_ko=ko,
-                content_hash=chash,
-                stars_today=stars_delta(hit.stars, prev_stars.get(hit.full_name)),
+                en, zh, ko = summ.en, summ.zh, summ.ko
+            items.append(
+                SnapshotItem(
+                    snapshot_id=snapshot.id,
+                    rank=idx + 1,
+                    repo_full_name=hit.full_name,
+                    repo_url=hit.html_url,
+                    description=hit.description,
+                    stars=hit.stars,
+                    language=hit.language,
+                    topics=hit.topics,
+                    readme_excerpt=(rr.clean.sanitized_readme or rr.clean.readme)[:3000] or None,
+                    summary_en=en or None,
+                    summary_zh=zh or None,
+                    summary_ko=ko or None,
+                    content_hash=chash,
+                    stars_today=stars_delta(hit.stars, prev_stars.get(hit.full_name)),
+                    taxonomy=rr.classification.label,
+                    taxonomy_confidence=rr.classification.confidence,
+                    rank_score=rr.rank_score,
+                    summary_status=summ.status,
+                )
             )
-
-        items = await asyncio.gather(*(process(i, h) for i, h in enumerate(ranked)))
         for item in items:
             session.add(item)
         session.commit()

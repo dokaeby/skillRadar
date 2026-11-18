@@ -23,16 +23,30 @@
 | 비밀값 환경변수 관리 | `config.py` (pydantic-settings), `.env` gitignore | 코드/로그 미노출 |
 | GitHub rate limit 대응 | `github_client.py` 지수 backoff + Retry-After | 403/429/5xx 재시도 |
 
-## 미구현 — 스택 변경 승인 필요 (AGENTS.md §2 "변경 시 승인 필요")
+## 스택 확장 구현 완료 (2026-11-18, 사용자 승인)
 
-| 항목 | 상태 | 비고 |
-|---|---|---|
-| LangChain 1.x | 미도입 | 현재 httpx 직접 호출. 도입 시 모델 팩토리/구조화 출력/도구 계층 재작성 필요 |
-| LangGraph 워크플로 | 미도입 | 현재 `collector.py` 선형 파이프라인. 노드 분리·조건 분기·interrupt는 그래프 도입 후 가능 |
-| LangSmith 트레이싱/평가 | 미도입 | 평가 지표 체계(§5) 전체가 이에 의존 |
-| Redis 캐시 | 미도입 | 현재 인메모리+DB 캐시만 사용 |
-| Tavily 관련 주제 확장 | 미도입 | 현재 topics는 GitHub 데이터 내에서만 집계 |
-| Ollama 임베딩 의미 검색 | 미도입 | |
+| 항목 | 상태 | 구현 위치 | 비고 |
+|---|---|---|---|
+| LangGraph 큐레이터 파이프라인 | ✅ | `src/backend/graph/` (state/nodes/pipeline) | collect→dedupe_filter→sanitize→classify→summarize→verify→rank→related. `collector.collect_platform`이 이를 호출 |
+| classify taxonomy 분류 | ✅ | `llm_tasks.classify_repo` + `graph/nodes.classify` | 8개 라벨 + confidence, `LLM_JUDGE_MODEL`(기본 gemini-3.5-flash-lite) |
+| verify 노드 | ✅ | `llm_tasks.verify_summary` + `graph/nodes.verify` | 실패 시 재요약 최대 2회 → `summary_status='unverified'` |
+| rank 고도화 | ✅ | `graph/nodes.rank` | `rank_score = log10(stars+1)*20 + (ok?5:0) + confidence*5`, `snapshot_items.rank_score` 저장, topic-repos 정렬에 반영 |
+| related 주제 | ✅ | `graph/nodes.related` + `GET /api/related-topics` + 사이드바 칩 UI | 토픽 공기반 점수, 최근 30일 수집분 기준 |
+| 골든 데이터셋 평가 | ✅ | `src/backend/eval/` (dataset.json 10개, metrics.py, run_eval.py) | `python -m backend.eval.run_eval` → docs/experiments/ 기록. 첫 실행 10/10 |
+| LangSmith | ✅ 준비 완료 | `graph/pipeline.py` env 제어 | `LANGSMITH_API_KEY`+`LANGSMITH_TRACING=true`일 때만 활성, 현재 키 없음 → 비활성 |
+| Redis 캐시 | ✅ | `src/backend/storage/cache.py` | `REDIS_URL`(Upstash) 설정 시 `RedisJsonCache`, 미설정/장애 시 `NullCache` 폴백 |
+| LangGraph 체크포인트 | ✅ | `graph/pipeline.py` `_checkpointer` | `CHECKPOINT_PATH` 지정 시 AsyncSqliteSaver, 미설치/미설정 시 MemorySaver |
+| pyright | ✅ 통과 | `pyrightconfig.json` (standard, extraPaths=src) | `npx pyright` 0 errors. strict 승격은 파일별 `# pyright: strict`로 점진 적용 예정 |
+| Tavily | ❌ 제외 | — | 비용 발생 — 사용자 지시로 도입하지 않음 |
+| Ollama 임베딩 의미 검색 | 미도입 | — | | |
+
+## 검증 결과 (2026-11-18)
+
+- `pytest`: 46 passed
+- `npx pyright`: 0 errors (standard 모드)
+- `npm run build` (tsc): 통과
+- API 스모크: `/`, `/api/topics`, `/api/topic-repos`, `/api/related-topics`, `/api/trending`, `/api/dates`, `/manifest.json`, `/sw.js`, `/api/push/vapid-key` 모두 200
+- Supabase `snapshot_items`에 `taxonomy`, `taxonomy_confidence`, `rank_score`, `summary_status` 컬럼 확인됨
 
 ## 미구현 — 현재 스택 내 보강 가능 (마일스톤 후보)
 

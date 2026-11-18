@@ -57,11 +57,14 @@ def _decode_line_text(s: str) -> str:
 
 def _loads_lenient(block: str):
     for candidate in (block, _preclean_block(block)):
-        for kwargs in ({}, {"strict": False}):
-            try:
-                return json.loads(candidate, **kwargs)
-            except json.JSONDecodeError:
-                continue
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+        try:
+            return json.loads(candidate, strict=False)
+        except json.JSONDecodeError:
+            continue
     return None
 
 
@@ -195,9 +198,10 @@ async def translate_ko(text: str) -> str:
 
         async with _get_translate_sem():
             await asyncio.sleep(_TRANSLATE_INTERVAL)
-            return await asyncio.to_thread(
+            result = await asyncio.to_thread(
                 MyMemoryTranslator(source="en-US", target="ko-KR").translate, text
             )
+            return result if isinstance(result, str) else " ".join(result)
     except Exception as exc:  # noqa: BLE001 - 번역 실패가 수집을 막으면 안 됨
         logger.info("한국어 번역 폴백 실패, 원문 사용: %s", exc)
         return text

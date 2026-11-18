@@ -40,6 +40,8 @@
   const trendBar = document.getElementById('trendBar') as HTMLElement;
   const topicList = document.getElementById('topicList') as HTMLElement;
   const topicHeader = document.getElementById('topicHeader') as HTMLElement;
+  const relatedTopics = document.getElementById('relatedTopics') as HTMLElement;
+  let allTopics: { topic: string; count: number }[] = [];
   const topicTitle = document.getElementById('topicTitle') as HTMLElement;
   const topicCount = document.getElementById('topicCount') as HTMLElement;
   const topicBack = document.getElementById('topicBack') as HTMLElement;
@@ -206,6 +208,7 @@
       const res = await fetch('/api/topics');
       const data = (await res.json()) as { topics?: { topic: string; count: number }[] };
       const topics = data.topics ?? [];
+      allTopics = topics;
       if (!topics.length) {
         topicList.innerHTML = '<p class="text-xs text-slate-500 px-2 py-3">주제 데이터가 없습니다</p>';
         return;
@@ -250,6 +253,33 @@
     trendBar.classList.add('hidden');
     syncTopicPlatformTabs();
     void loadTopicRepos();
+    void loadRelatedTopics(topic);
+  }
+
+  async function loadRelatedTopics(topic: string): Promise<void> {
+    relatedTopics.innerHTML = '';
+    try {
+      const res = await fetch(`/api/related-topics?topic=${encodeURIComponent(topic)}`);
+      const data = (await res.json()) as { related?: { topic: string; score: number }[] };
+      const related = (data.related ?? []).filter((r) => r.topic !== topic).slice(0, 8);
+      if (!related.length) return;
+      const label = document.createElement('span');
+      label.className = 'text-[10px] uppercase tracking-wider text-slate-400 self-center mr-1';
+      label.textContent = '관련 주제';
+      relatedTopics.appendChild(label);
+      for (const r of related) {
+        const btn = document.createElement('button');
+        btn.className = 'px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/[.04] border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:border-[#d97757]/50 hover:text-[#d97757] transition-colors';
+        btn.textContent = `#${r.topic}`;
+        btn.addEventListener('click', () => {
+          const t = allTopics.find((x) => x.topic === r.topic);
+          selectTopic(r.topic, t?.count ?? 0);
+        });
+        relatedTopics.appendChild(btn);
+      }
+    } catch {
+      /* 관련 주제 실패는 무시 */
+    }
   }
 
   function clearTopic(): void {

@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     schedule_timezone: str = Field(default="Asia/Seoul", max_length=64)
     translate_fallback: bool = True  # LLM 실패 시 description을 Google 번역으로 한국어화
     queries_path: Path = Path(__file__).parent / "queries.yaml"
+    redis_url: str = Field(default="", max_length=500)  # Upstash 등; 비우면 캐시 비활성
+    langsmith_api_key: SecretStr = Field(default=SecretStr(""), max_length=255)
+    langsmith_project: str = Field(default="skillradar", max_length=100)
+    langsmith_tracing: bool = False
+    llm_judge_model: str = Field(default="", max_length=100)  # 비우면 llm_model 사용
+    checkpoint_path: str = Field(default="", max_length=500)  # LangGraph SQLite 체크포인터
 
     @field_validator("database_url")
     @classmethod
@@ -45,6 +51,18 @@ class Settings(BaseSettings):
         if value and not value.startswith(("https://", "http://localhost")):
             raise ValueError("LLM_BASE_URL은 https 주소여야 합니다.")
         return value
+
+    @property
+    def langsmith_enabled(self) -> bool:
+        return self.langsmith_tracing and bool(self.langsmith_api_key.get_secret_value())
+
+    @property
+    def redis_enabled(self) -> bool:
+        return bool(self.redis_url)
+
+    @property
+    def judge_model(self) -> str:
+        return self.llm_judge_model or self.llm_model
 
     @property
     def llm_enabled(self) -> bool:

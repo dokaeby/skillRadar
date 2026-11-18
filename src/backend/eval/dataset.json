@@ -1,0 +1,12 @@
+[
+  {"repo": "anthropics/skills", "expected_label": "skills", "note": "Anthropic 공식 Agent Skills 모음"},
+  {"repo": "modelcontextprotocol/servers", "expected_label": "mcp", "note": "MCP 레퍼런스 서버 모음"},
+  {"repo": "microsoft/playwright-mcp", "expected_label": "mcp", "note": "Playwright MCP 서버"},
+  {"repo": "browser-use/browser-use", "expected_label": "agents", "note": "LLM 기반 브라우저 자동화 에이전트"},
+  {"repo": "microsoft/autogen", "expected_label": "agents", "note": "다중 에이전트 대화 프레임워크"},
+  {"repo": "microsoft/vscode", "expected_label": "devtools", "note": "코드 에디터 — AI 도구 생태계의 기반"},
+  {"repo": "obsidianmd/obsidian-sample-plugin", "expected_label": "plugins", "note": "Obsidian 플러그인 샘플"},
+  {"repo": "puppeteer/puppeteer", "expected_label": "automation", "note": "헤드리스 브라우저 자동화"},
+  {"repo": "huggingface/datasets", "expected_label": "data", "note": "데이터셋 로딩/처리 라이브러리"},
+  {"repo": "sindresorhus/awesome", "expected_label": "other", "note": "큐레이션 목록 — AI 툴링 경계 사례"}
+]

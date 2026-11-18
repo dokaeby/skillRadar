@@ -161,8 +161,8 @@ async def test_llm_failure_translates_ko_when_enabled(db_session, settings, monk
     snap = await collect_platform("claude", db_session, settings, github=gh,
                                   summarizer=BadSummarizer(), collected_date=date(2026, 11, 18))
     item = snap.items[0]
-    assert item.summary_en[0] == "English description"
-    assert item.summary_ko[0].startswith("[KO]")
+    assert item.summary_en is not None and item.summary_en[0] == "English description"
+    assert item.summary_ko is not None and item.summary_ko[0].startswith("[KO]")
 
 
 @pytest.mark.asyncio
@@ -177,4 +177,4 @@ async def test_llm_failure_still_collects(db_session, settings):
     snap = await collect_platform("claude", db_session, settings, github=gh,
                                   summarizer=BadSummarizer(), collected_date=date(2026, 11, 18))
     item = snap.items[0]
-    assert item.summary_en[0] == "fallback desc"
+    assert item.summary_en is not None and item.summary_en[0] == "fallback desc"

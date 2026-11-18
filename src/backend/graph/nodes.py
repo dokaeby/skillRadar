@@ -132,7 +132,7 @@ async def collect(state: Any) -> dict[str, Any]:
 
 
 async def dedupe_filter(state: Any) -> dict[str, Any]:
-    """archived/fork 제외 + stars 상위 30개만 유지."""
+    """archived/fork 제외 + stars 상위 10개만 유지 (_TOP_K)."""
     repos: list[RepoRaw] = list(_state_get(state, "repos_raw", []) or [])
     before = len(repos)
     kept = [r for r in repos if not (r.archived or r.fork)]

@@ -282,5 +282,6 @@ async def index(request: Request) -> HTMLResponse:
     settings: Settings = request.app.state.settings
     template = request.app.state.templates.get_template("index.html")
     return HTMLResponse(
-        template.render(request=request, vapid_public_key=settings.vapid_public_key)
+        template.render(request=request, vapid_public_key=settings.vapid_public_key),
+        headers={"Cache-Control": "no-cache"},
     )

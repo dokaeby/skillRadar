@@ -138,7 +138,7 @@
 
   function renderCard(item: TrendingItem): string {
     const topics = (item.topics || []).slice(0, 4)
-      .map((t) => `<span class="topic-chip text-[10px] px-2 py-0.5 rounded-full bg-white/[.05] dark:bg-white/[.05] border border-white/[.07] dark:border-white/[.07] text-slate-500 dark:text-slate-400">${escapeHtml(t)}</span>`)
+      .map((t) => `<span class="topic-chip text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.07] text-slate-600 dark:text-slate-400">${escapeHtml(t)}</span>`)
       .join('');
     const delta = item.stars_today;
     const deltaInner = delta === null || delta === undefined
@@ -155,7 +155,7 @@
     return `
     <article class="card fade-up rounded-2xl p-5 flex flex-col gap-3.5">
       <div class="flex items-start gap-3">
-        <span class="rank-badge shrink-0 w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-slate-200 dark:text-slate-200">${item.rank}</span>
+        <span class="rank-badge shrink-0 w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-slate-700 dark:text-slate-200">${item.rank}</span>
         <div class="min-w-0 flex-1">
           <a href="${item.repo_url}" target="_blank" rel="noopener"
              class="font-semibold text-[15px] leading-snug text-slate-800 dark:text-slate-100 hover:text-blue-500 dark:hover:text-blue-400 underline-offset-4 decoration-slate-400/50 hover:underline truncate block transition-colors">
@@ -164,17 +164,17 @@
           ${description}
           ${item.platform ? `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${PLATFORM_BADGE[item.platform] ?? 'text-slate-500'}"><span class="w-1.5 h-1.5 rounded-full ${PLATFORM_DOT[item.platform] ?? 'bg-slate-500'}"></span>${item.platform}</span>` : ''}
           <div class="flex items-center gap-3 mt-2 text-xs text-slate-600 dark:text-slate-400 flex-wrap">
-            ${item.language ? `<span class="px-2 py-0.5 rounded-md bg-white/[.05] dark:bg-white/[.05] border border-white/[.07] dark:border-white/[.07] font-medium">${escapeHtml(item.language)}</span>` : ''}
+            ${item.language ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.07] font-medium text-slate-700 dark:text-slate-200">${escapeHtml(item.language)}</span>` : ''}
             <span class="inline-flex items-center gap-1">${ICON.star}<span class="font-medium text-slate-600 dark:text-slate-300">${fmtStars(item.stars)}</span></span>
             <span class="inline-flex items-center gap-1">오늘 ${deltaInner}</span>
           </div>
         </div>
       </div>
       <ul class="text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 space-y-2">${lines}</ul>
-      <div class="flex items-center justify-between gap-2 mt-auto pt-2.5 border-t border-white/[.05] dark:border-white/[.05]">
+      <div class="flex items-center justify-between gap-2 mt-auto pt-2.5 border-t border-slate-200/80 dark:border-white/[.05]">
         <div class="flex gap-1.5 flex-wrap">${topics}</div>
         <a href="${item.repo_url}" target="_blank" rel="noopener"
-           class="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-white/[.06] dark:bg-white/[.06] border border-white/10 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-white/[.12] dark:hover:bg-white/[.12] transition-colors">
+           class="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-white/[.06] border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/[.12] transition-colors">
           GitHub ${ICON.arrow}
         </a>
       </div>
@@ -217,7 +217,7 @@
         <button class="topic-btn shrink-0 lg:w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[.05] dark:hover:bg-white/[.05] hover:text-slate-800 dark:hover:text-slate-200 transition-colors flex items-center justify-between gap-2"
                 data-topic="${escapeHtml(t.topic)}">
           <span class="truncate"># ${escapeHtml(t.topic)}</span>
-          <span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-white/[.05] border border-white/[.08] text-slate-500 dark:text-slate-500">${t.count}</span>
+          <span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.08] text-slate-600 dark:text-slate-500">${t.count}</span>
         </button>`).join('');
       topicList.querySelectorAll<HTMLButtonElement>('.topic-btn').forEach((btn) => {
         btn.addEventListener('click', () => {

@@ -40,6 +40,7 @@ class RepoRaw(BaseModel):
     topics: list[str] = Field(default_factory=list)
     archived: bool = False
     fork: bool = False
+    license: str | None = None
 
 
 class RepoClean(BaseModel):

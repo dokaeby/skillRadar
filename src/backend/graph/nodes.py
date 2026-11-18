@@ -83,6 +83,7 @@ def _hit_to_raw(hit: RepoHit) -> RepoRaw:
         topics=list(hit.topics),
         archived=hit.archived,
         fork=hit.fork,
+        license=hit.license,
     )
 
 

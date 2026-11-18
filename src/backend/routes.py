@@ -31,6 +31,7 @@ class TrendingItem(BaseModel):
     stars: int
     stars_today: int | None
     language: str | None
+    license: str | None = None
     topics: list[str]
     summary: list[str]
     platform: str | None = None
@@ -59,6 +60,7 @@ def _serialize_item(item, lang: str, platform: str | None = None) -> TrendingIte
         stars=item.stars,
         stars_today=item.stars_today,
         language=item.language,
+        license=item.license,
         topics=item.topics or [],
         summary=item.summary_for(lang),
         platform=platform,

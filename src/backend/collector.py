@@ -110,6 +110,7 @@ async def collect_platform(
                     summary_ko=ko or None,
                     content_hash=chash,
                     stars_today=stars_delta(hit.stars, prev_stars.get(hit.full_name)),
+                    license=hit.license,
                     taxonomy=rr.classification.label,
                     taxonomy_confidence=rr.classification.confidence,
                     rank_score=rr.rank_score,

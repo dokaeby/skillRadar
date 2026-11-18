@@ -61,6 +61,7 @@ class SnapshotItem(Base):
     summary_en: Mapped[list[str] | None] = mapped_column(JSON)
     summary_zh: Mapped[list[str] | None] = mapped_column(JSON)
     summary_ko: Mapped[list[str] | None] = mapped_column(JSON)
+    license: Mapped[str | None] = mapped_column(String(50))
     taxonomy: Mapped[str | None] = mapped_column(String(50))
     taxonomy_confidence: Mapped[float | None] = mapped_column(Float)
     rank_score: Mapped[float | None] = mapped_column(Float)

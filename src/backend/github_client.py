@@ -27,6 +27,7 @@ class RepoHit:
     topics: list[str] = field(default_factory=list)
     archived: bool = False
     fork: bool = False
+    license: str | None = None  # SPDX id (MIT, Apache-2.0 등)
 
 
 class GitHubClient:
@@ -110,6 +111,7 @@ class GitHubClient:
                     topics=list(item.get("topics") or []),
                     archived=bool(item.get("archived")),
                     fork=bool(item.get("fork")),
+                    license=(item.get("license") or {}).get("spdx_id"),
                 )
             )
         return hits

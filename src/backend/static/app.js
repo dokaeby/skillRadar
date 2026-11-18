@@ -102,6 +102,26 @@
             return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
         return String(n);
     }
+    function licenseShort(license) {
+        const map = {
+            'Apache-2.0': 'Apache-2.0', 'MIT': 'MIT', 'BSD-2-Clause': 'BSD-2',
+            'BSD-3-Clause': 'BSD-3', 'GPL-3.0': 'GPL-3', 'GPL-2.0': 'GPL-2',
+            'AGPL-3.0': 'AGPL-3', 'LGPL-3.0': 'LGPL-3', 'MPL-2.0': 'MPL-2.0',
+            'ISC': 'ISC', 'Unlicense': 'Unlicense', '0BSD': '0BSD',
+            'CC0-1.0': 'CC0', 'EPL-2.0': 'EPL-2', 'BSL-1.0': 'BSL',
+            'Elastic-2.0': 'Elastic-2', 'MS-PL': 'MS-PL', 'Zlib': 'Zlib',
+            'WTFPL': 'WTFPL', 'Python-2.0': 'PSF', 'Artistic-2.0': 'Artistic',
+        };
+        if (map[license])
+            return map[license];
+        const m = license.match(/^GPL-(\d+\.0)/);
+        if (m)
+            return `GPL-${m[1]}`;
+        const b = license.match(/^BSD-(\d)-Clause/);
+        if (b)
+            return `BSD-${b[1]}`;
+        return license.length > 12 ? license.slice(0, 12) : license;
+    }
     function escapeHtml(s) {
         const map = {
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -134,6 +154,7 @@
           ${description}
           ${item.platform ? `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${PLATFORM_BADGE[item.platform] ?? 'text-slate-500'}"><span class="w-1.5 h-1.5 rounded-full ${PLATFORM_DOT[item.platform] ?? 'bg-slate-500'}"></span>${item.platform}</span>` : ''}
           <div class="flex items-center gap-3 mt-2 text-xs text-slate-600 dark:text-slate-400 flex-wrap">
+            ${item.license ? `<span class="px-2 py-0.5 rounded-md font-bold text-[10px] tracking-wide bg-amber-100 dark:bg-amber-400/15 border border-amber-300 dark:border-amber-400/30 text-amber-800 dark:text-amber-300" title="License: ${escapeHtml(item.license)}">${escapeHtml(licenseShort(item.license))}</span>` : ''}
             ${item.language ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.07] font-medium text-slate-700 dark:text-slate-200">${escapeHtml(item.language)}</span>` : ''}
             <span class="inline-flex items-center gap-1">${ICON.star}<span class="font-medium text-slate-600 dark:text-slate-300">${fmtStars(item.stars)}</span></span>
             <span class="inline-flex items-center gap-1">오늘 ${deltaInner}</span>

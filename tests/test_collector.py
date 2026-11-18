@@ -178,3 +178,46 @@ async def test_llm_failure_still_collects(db_session, settings):
                                   summarizer=BadSummarizer(), collected_date=date(2026, 11, 18))
     item = snap.items[0]
     assert item.summary_en is not None and item.summary_en[0] == "fallback desc"
+
+
+@pytest.mark.asyncio
+async def test_collect_all_runs_platforms_in_parallel(tmp_path, settings, monkeypatch):
+    """collect_all은 플랫폼 수집을 병렬로 실행하고 실패를 격리한다."""
+    import asyncio
+    import time
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    import backend.collector as collector
+    from backend.models import Base
+
+    engine = create_engine(f"sqlite:///{tmp_path}/par.db", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    active = 0
+    max_active = 0
+
+    async def fake_collect(platform, session, settings, **kw):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.2)
+        active -= 1
+        if platform == "bad":
+            raise RuntimeError("platform fail")
+        return object()
+
+    monkeypatch.setattr(collector, "collect_platform", fake_collect)
+
+    start = time.monotonic()
+    results = await collector.collect_all(
+        factory, settings, platforms=("claude", "chatgpt", "gemini", "bad")
+    )
+    elapsed = time.monotonic() - start
+
+    assert max_active >= 3  # 최소 3개 플랫폼이 동시에 실행됨
+    assert elapsed < 0.55  # 직렬이면 ~0.8s
+    assert len(results) == 3  # 실패한 bad만 제외
+    engine.dispose()

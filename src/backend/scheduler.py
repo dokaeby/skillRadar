@@ -17,9 +17,9 @@ _scheduler: AsyncIOScheduler | None = None
 
 async def run_daily_collect(session_factory: sessionmaker[Session], settings: Settings) -> None:
     """수집 + 푸시 알림. 스케줄러와 수동 refresh가 공용으로 쓴다."""
+    await collect_all(session_factory, settings)
     session = session_factory()
     try:
-        await collect_all(session, settings)
         await notify_daily_top(session, settings)
     finally:
         session.close()

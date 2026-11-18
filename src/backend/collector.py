@@ -5,7 +5,7 @@ import logging
 from datetime import date
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings
 from backend.github_client import GitHubClient, RepoHit, stars_delta, today_kst
@@ -133,19 +133,26 @@ async def collect_platform(
 
 
 async def collect_all(
-    session: Session,
+    session_factory: sessionmaker[Session],
     settings: Settings,
     platforms: tuple[str, ...] = ("claude", "chatgpt", "gemini"),
 ) -> list[Snapshot]:
-    """전체 플랫폼 수집. 한 플랫폼 실패가 다른 플랫폼을 막지 않는다."""
-    results: list[Snapshot] = []
-    for platform in platforms:
+    """플랫폼별 수집을 병렬 실행한다. 플랫폼마다 독립 세션을 쓰고,
+    한 플랫폼 실패가 다른 플랫폼을 막지 않는다."""
+
+    async def _one(platform: str) -> Snapshot | None:
+        session = session_factory()
         try:
-            results.append(await collect_platform(platform, session, settings))
+            return await collect_platform(platform, session, settings)
         except Exception as exc:  # noqa: BLE001 - 플랫폼별 격리
             logger.exception("%s 수집 실패: %s", platform, exc)
             session.rollback()
-    return results
+            return None
+        finally:
+            session.close()
+
+    results = await asyncio.gather(*(_one(p) for p in platforms))
+    return [r for r in results if r is not None]
 
 
 def _previous_stars(

@@ -17,9 +17,9 @@ async def main() -> None:
     settings = get_settings()
     init_db()
     factory = session_factory()
+    await collect_all(factory, settings)
     session = factory()
     try:
-        await collect_all(session, settings)
         await notify_daily_top(session, settings)
     finally:
         session.close()

@@ -1,8 +1,15 @@
 """FastAPI 앱 조립. DAIT의 create_app 패턴을 따른다."""
 
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# Vercel 서버리스는 이 파일을 패키지 컨텍스트 없이 직접 로드하므로
+# src/를 sys.path에 추가해 `backend.*` 임포트가 동작하게 한다.
+_SRC = str(Path(__file__).resolve().parent.parent)
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles

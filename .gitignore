@@ -9,3 +9,5 @@ test_*.db
 .DS_Store
 node_modules/
 .serena/
+.vercel
+.env*

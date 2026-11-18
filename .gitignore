@@ -12,3 +12,33 @@ node_modules/
 .vercel
 .env*
 .playwright-mcp/
+
+# 시크릿/자격증명 파일
+.env.local
+.env.*.local
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+secrets.*
+secrets/
+credentials.*
+credentials.json
+service-account*.json
+*-credentials.json
+gcp-*.json
+supabase-*.json
+.vercel
+
+# 로컬 DB 덤프/백업
+*.sql.gz
+*.dump
+*.sqlite3
+backups/
+
+# 로컬 로그
+*.log
+logs/

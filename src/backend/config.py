@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     llm_base_url: str = Field(default="https://api.openai.com/v1", max_length=200)
     llm_model: str = Field(default="gpt-4o-mini", max_length=100)
     admin_token: SecretStr = Field(default=SecretStr(""), max_length=255)
+    cron_secret: SecretStr = Field(default=SecretStr(""), max_length=255)  # Vercel Cron 인증용
     vapid_public_key: str = Field(default="", max_length=200)
     vapid_private_key: SecretStr = Field(default=SecretStr(""), max_length=255)
     vapid_subject: str = Field(default="mailto:admin@example.com", max_length=200)

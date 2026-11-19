@@ -9,6 +9,7 @@ import asyncio
 import inspect
 import logging
 import math
+from dataclasses import dataclass
 from typing import Any
 
 from backend.config import Settings, get_settings
@@ -35,36 +36,54 @@ _TOP_K = 10  # LLM 호출 비용 절약: 분류·요약·검증은 Top10만
 _FINAL_TOP_N = 10
 _MAX_RETRIES = 2
 
-_settings_override: Settings | None = None
-_github_override: GitHubLike | None = None
-_summarizer_override: SummarizerLike | None = None
-_summary_cache_override: Any = None
+@dataclass
+class _RuntimeDeps:
+    settings: Settings | None = None
+    github: GitHubLike | None = None
+    summarizer: SummarizerLike | None = None
+    summary_cache: Any = None
+
+
+# collect_all이 플랫폼별 파이프라인을 동시에 실행하므로 의존성은
+# 플랫폼 키로 분리한다. 전역 하나를 공유하면 서로 덮어쓰고
+# 이미 닫힌 httpx 클라이언트를 참조하게 된다.
+_runtime: dict[str, _RuntimeDeps] = {}
 
 
 def configure_runtime(
+    platform: str,
     settings: Settings | None = None,
     github: GitHubLike | None = None,
     summarizer: SummarizerLike | None = None,
     summary_cache: Any = None,
 ) -> None:
-    """run_platform_pipeline이 호출해 노드 의존성을 주입한다.
+    """run_platform_pipeline이 호출해 해당 플랫폼 노드의 의존성을 주입한다.
 
     summary_cache: async (full_name, description, sanitized_readme) ->
     SummaryResult | dict | tuple | None — 히트 시 LLM 호출을 건너뛴다.
     """
-    global _settings_override, _github_override, _summarizer_override, _summary_cache_override
-    _settings_override = settings
-    _github_override = github
-    _summarizer_override = summarizer
-    _summary_cache_override = summary_cache
+    _runtime[platform] = _RuntimeDeps(
+        settings=settings,
+        github=github,
+        summarizer=summarizer,
+        summary_cache=summary_cache,
+    )
 
 
-def reset_runtime() -> None:
-    configure_runtime()
+def reset_runtime(platform: str) -> None:
+    _runtime.pop(platform, None)
 
 
-def _settings() -> Settings:
-    return _settings_override or get_settings()
+def _platform_of(state: Any) -> str:
+    return str(_state_get(state, "platform", "claude") or "claude")
+
+
+def _deps(state: Any) -> _RuntimeDeps:
+    return _runtime.get(_platform_of(state)) or _RuntimeDeps()
+
+
+def _settings(state: Any) -> Settings:
+    return _deps(state).settings or get_settings()
 
 
 def _state_get(state: Any, key: str, default: Any = None) -> Any:
@@ -87,9 +106,11 @@ def _hit_to_raw(hit: RepoHit) -> RepoRaw:
     )
 
 
-def _summarizer(settings: Settings) -> SummarizerLike:
-    if _summarizer_override is not None:
-        return _summarizer_override
+def _summarizer(state: Any) -> SummarizerLike:
+    deps = _deps(state)
+    if deps.summarizer is not None:
+        return deps.summarizer
+    settings = _settings(state)
     return Summarizer(
         api_key=settings.llm_api_key.get_secret_value(),
         base_url=settings.llm_base_url,
@@ -101,9 +122,9 @@ async def collect(state: Any) -> dict[str, Any]:
     """queries로 GitHub 검색 → RepoRaw 수집. full_name 중복은 stars 최대값 유지."""
     errors = list(_state_get(state, "errors", []) or [])
     queries = list(_state_get(state, "queries", []) or [])
-    settings = _settings()
+    settings = _settings(state)
 
-    shared = _state_get(state, "github") or _github_override
+    shared = _state_get(state, "github") or _deps(state).github
     client = shared if shared is not None else None
     owns_client = client is None
     if client is None:
@@ -149,9 +170,9 @@ async def sanitize(state: Any) -> dict[str, Any]:
     """각 repo의 README를 가져와 정제. 동시성 5, 노드당 GitHubClient 1개."""
     repos: list[RepoRaw] = list(_state_get(state, "repos_raw", []) or [])
     errors = list(_state_get(state, "errors", []) or [])
-    settings = _settings()
+    settings = _settings(state)
 
-    shared = _state_get(state, "github") or _github_override
+    shared = _state_get(state, "github") or _deps(state).github
     client = shared if shared is not None else None
     owns_client = client is None
     if client is None:
@@ -204,7 +225,7 @@ async def classify(state: Any) -> dict[str, Any]:
         _state_get(state, "classifications", {}) or {}
     )
     errors = list(_state_get(state, "errors", []) or [])
-    settings = _settings()
+    settings = _settings(state)
 
     if not settings.llm_enabled:
         for clean in cleans:
@@ -254,7 +275,7 @@ async def summarize(state: Any) -> dict[str, Any]:
     prev: dict[str, SummaryResult] = dict(_state_get(state, "summaries", {}) or {})
     errors = list(_state_get(state, "errors", []) or [])
     platform = str(_state_get(state, "platform", "claude") or "claude")
-    summarizer = _summarizer(_settings())
+    summarizer = _summarizer(state)
 
     sem = asyncio.Semaphore(5)
 
@@ -274,9 +295,10 @@ async def summarize(state: Any) -> dict[str, Any]:
     async def _one(clean: RepoClean) -> tuple[str, SummaryResult]:
         async with sem:
             try:
-                if _summary_cache_override is not None:
+                summary_cache = _deps(state).summary_cache
+                if summary_cache is not None:
                     try:
-                        cached = _summary_cache_override(
+                        cached = summary_cache(
                             clean.repo.full_name,
                             clean.repo.description,
                             clean.sanitized_readme,
@@ -326,14 +348,14 @@ async def verify(state: Any) -> dict[str, Any]:
     summaries: dict[str, SummaryResult] = dict(_state_get(state, "summaries", {}) or {})
     retries: dict[str, int] = dict(_state_get(state, "retries", {}) or {})
     errors = list(_state_get(state, "errors", []) or [])
-    settings = _settings()
+    settings = _settings(state)
 
     if not settings.llm_enabled:
         return {"summaries": summaries, "retries": retries}
 
     by_name = {c.repo.full_name: c for c in cleans}
     platform = str(_state_get(state, "platform", "claude") or "claude")
-    summarizer = _summarizer(settings)
+    summarizer = _summarizer(state)
     sem = asyncio.Semaphore(4)
 
     async def _one(clean: RepoClean) -> None:

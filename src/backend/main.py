@@ -1,5 +1,6 @@
 """FastAPI 앱 조립. DAIT의 create_app 패턴을 따른다."""
 
+import os
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -32,7 +33,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await run_in_threadpool(init_db)
         factory = session_factory()
         app.state.session_factory = factory
-        start_scheduler(factory, config)
+        # Vercel serverless는 요청 사이에 인스턴스가 동결되어 APScheduler가
+        # 신뢰성 있게 동작하지 않는다. 수집은 vercel.json Cron이 담당한다.
+        # (Render 같은 상시 서버에서는 VERCEL env가 없어 정상 동작)
+        if not os.environ.get("VERCEL"):
+            start_scheduler(factory, config)
         yield
         stop_scheduler()
 

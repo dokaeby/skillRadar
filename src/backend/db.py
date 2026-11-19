@@ -17,7 +17,13 @@ def make_engine(database_url: str):
         url = "postgresql+psycopg://" + url[len("postgres://") :]
     elif url.startswith("postgresql://"):
         url = "postgresql+psycopg://" + url[len("postgresql://") :]
-    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+    if url.startswith("sqlite"):
+        connect_args = {"check_same_thread": False}
+    else:
+        # Supabase pooler(특히 transaction 모드)에서는 서버 커넥션이
+        # 여러 클라이언트에 공유되어 prepared statement 이름이 충돌한다
+        # (DuplicatePreparedStatement). psycopg의 자동 prepare를 끈다.
+        connect_args = {"prepare_threshold": None}
     # 서버리스 환경에서 인스턴스 수만큼 엔진이 생기므로 Postgres는 커넥션 풀을 작게 유지한다.
     pool_kwargs = (
         {"pool_size": 2, "max_overflow": 3, "pool_recycle": 300}

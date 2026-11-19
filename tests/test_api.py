@@ -31,6 +31,7 @@ def client(tmp_path, monkeypatch):
         app_env="debug",
         database_url=f"sqlite:///{tmp_path}/api.db",
         admin_token=SecretStr("secret-admin"),
+        cron_secret=SecretStr("secret-cron"),
         github_token=SecretStr(""),
         llm_api_key=SecretStr(""),
         vapid_public_key="",
@@ -130,6 +131,28 @@ def test_admin_refresh_requires_token(client):
     c, _ = client
     assert c.post("/api/admin/refresh").status_code == 401
     assert c.post("/api/admin/refresh", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    # Vercel Cron은 GET으로 호출한다
+    assert c.get("/api/admin/refresh").status_code == 401
+    assert c.get("/api/admin/refresh", headers={"Authorization": "Bearer wrong"}).status_code == 401
+
+
+def test_admin_refresh_accepts_admin_and_cron_token(client, monkeypatch):
+    c, _ = client
+
+    async def fake_collect(factory, settings):
+        return []
+
+    monkeypatch.setattr("backend.routes.run_daily_collect", fake_collect)
+    # get_session과 마찬가지로 get_settings도 테스트 설정으로 교체한다
+    from backend.config import get_settings
+
+    c.app.dependency_overrides[get_settings] = lambda: c.app.state.settings
+    for token in ("secret-admin", "secret-cron"):
+        res = c.get("/api/admin/refresh", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
+        assert res.json() == {"status": "ok"}
+        res = c.post("/api/admin/refresh", headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
 
 
 def test_dates_endpoint(client):

@@ -223,7 +223,8 @@ async def related_topics(
     }
 
 
-@router.post("/api/admin/refresh")
+# Vercel Cron은 GET으로 호출한다. POST는 수동 실행용으로 함께 허용한다.
+@router.api_route("/api/admin/refresh", methods=["GET", "POST"])
 async def admin_refresh(
     request: Request,
     authorization: str | None = Header(default=None),
@@ -235,7 +236,9 @@ async def admin_refresh(
     if authorization and authorization.startswith("Bearer "):
         token = authorization[7:]
     expected = settings.admin_token.get_secret_value()
-    if not expected or not hmac.compare_digest(token, expected):
+    cron_expected = settings.cron_secret.get_secret_value()
+    allowed = [t for t in (expected, cron_expected) if t]
+    if not token or not any(hmac.compare_digest(token, t) for t in allowed):
         raise HTTPException(status_code=401, detail="unauthorized")
 
     await run_daily_collect(request.app.state.session_factory, settings)

@@ -80,6 +80,7 @@ async def run_platform_pipeline(
     SummaryResult|dict|tuple|None. 히트 시 해당 repo의 LLM 요약을 건너뛴다.
     """
     nodes.configure_runtime(
+        platform,
         settings=settings, github=github, summarizer=summarizer,
         summary_cache=summary_cache,
     )
@@ -112,4 +113,4 @@ async def run_platform_pipeline(
             return result
         return CuratorState.model_validate(result)
     finally:
-        nodes.reset_runtime()
+        nodes.reset_runtime(platform)

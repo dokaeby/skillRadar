@@ -2,6 +2,9 @@
 /* SkillRadar service worker: Web Push 수신 */
 /// <reference lib="webworker" />
 const sw = self;
+/** 푸시 수신 시 OS 알림 표시.
+ *  입력: event — PushEvent(페이로드 JSON) / 출력: 없음
+ *  결과: showNotification으로 알림 표시, 클릭 시 data.url로 이동 */
 sw.addEventListener('push', (event) => {
     let data = {
         title: 'SkillRadar',
@@ -22,6 +25,9 @@ sw.addEventListener('push', (event) => {
         data: { url: data.url || '/' },
     }));
 });
+/** 알림 클릭 시 해당 URL을 새 탭/창에서 연다.
+ *  입력: event — NotificationEvent / 출력: 없음
+ *  결과: notification 닫기 + clients.openWindow */
 sw.addEventListener('notificationclick', (event) => {
     event.notification.close();
     const url = event.notification.data?.url || '/';

@@ -8,7 +8,11 @@ def classification_metrics(
 ) -> dict[str, Any]:
     """예측/정답 {repo: label} 딕셔너리를 비교해 지표를 반환한다.
 
-    반환: accuracy, 레이블별 precision/recall/support, macro 평균, 샘플 수.
+    입력:
+      - predicted: dict[str, str]
+      - expected: dict[str, str]
+    출력: dict[str, Any]
+    결과: 없음 (지표 dict 반환)
     """
     n = len(expected)
     if n == 0:

@@ -97,8 +97,16 @@ async def _chat_json(
 ) -> dict[str, Any] | None:
     """chat/completions를 호출하고 응답 content에서 JSON 객체를 추출한다.
 
-    429/503이면 15초 후 1회 재시도. 모든 실패 시 None 반환 (경고 로그).
-    client를 넘기지 않으면 내부에서 생성하고 닫는다. 넘긴 client는 닫지 않는다.
+    입력:
+      - prompt: str
+      - api_key: str
+      - base_url: str
+      - model: str
+      - client: httpx.AsyncClient | None
+      - temperature: float
+      - timeout: float
+    출력: dict[str, Any] | None
+    결과: LLM 구조화 출력 호출. 실패/파싱 불가 시 None
     """
     url = base_url.rstrip("/") + "/chat/completions"
     owns_client = client is None
@@ -145,7 +153,13 @@ async def _chat_json(
 
 
 def _readme_excerpt(readme: str) -> str:
-    """README를 프롬프트용으로 정제(인젝션 의심 줄 제거) 후 2000자로 자른다."""
+    """README를 프롬프트용으로 정제(인젝션 의심 줄 제거) 후 2000자로 자른다.
+
+    입력:
+      - readme: str
+    출력: str
+    결과: 없음 (README 앞부분 추출)
+    """
     return sanitize_readme(readme, max_chars=2000) or "(empty)"
 
 
@@ -160,7 +174,20 @@ async def classify_repo(
     model: str,
     client: httpx.AsyncClient | None = None,
 ) -> Classification:
-    """저장소를 taxonomy 라벨+신뢰도로 분류한다. 실패/무효 응답 시 ('other', 0.0)."""
+    """저장소를 taxonomy 라벨+신뢰도로 분류한다. 실패/무효 응답 시 ('other', 0.0).
+
+    입력:
+      - description: str | None
+      - readme: str
+      - name: str
+      - topics: list[str]
+      - api_key: str
+      - base_url: str
+      - model: str
+      - client: httpx.AsyncClient | None
+    출력: Classification
+    결과: LLM 분류 호출. 실패 시 "other" 라벨 폴백
+    """
     prompt = _CLASSIFY_PROMPT.format(
         labels=", ".join(TAXONOMY_LABELS),
         name=name,
@@ -200,9 +227,15 @@ async def verify_summary(
 ) -> bool:
     """요약 각 줄이 README 근거에 있는지 검증한다.
 
-    API/파싱 실패 시 True를 반환한다 — 검증기 장애가 수집 파이프라인을
-    막지 않도록 "검증 불가"를 "불합격"과 구분하기 위함이다.
-    명시적 {"supported": false} 응답만 False를 반환한다.
+    입력:
+      - readme: str
+      - summary_lines: list[str]
+      - api_key: str
+      - base_url: str
+      - model: str
+      - client: httpx.AsyncClient | None
+    출력: bool
+    결과: judge 모델로 요약 충실도 검증. 실패 시 True(통과 처리)
     """
     prompt = _VERIFY_PROMPT.format(
         summary_lines="\n".join(f"- {line}" for line in summary_lines),
@@ -231,9 +264,15 @@ async def judge_summary(
 ) -> float:
     """요약의 README 충실도 점수(0..1)를 반환한다.
 
-    판정 불가 시 -1.0을 반환한다 — 평가(eval) 측에서 "채점 실패"를
-    낮은 점수와 구분해 제외할 수 있도록 하는 센티널 값이다.
-    점수가 [0,1] 밖이면 클램프한다.
+    입력:
+      - readme: str
+      - summary_lines: list[str]
+      - api_key: str
+      - base_url: str
+      - model: str
+      - client: httpx.AsyncClient | None
+    출력: float
+    결과: judge 모델로 요약 점수(0~1) 산출. 실패 시 0.0
     """
     prompt = _JUDGE_PROMPT.format(
         summary_lines="\n".join(f"- {line}" for line in summary_lines),

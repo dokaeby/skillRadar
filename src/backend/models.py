@@ -73,7 +73,13 @@ class SnapshotItem(Base):
     snapshot: Mapped[Snapshot] = relationship(back_populates="items")
 
     def summary_for(self, lang: str) -> list[str]:
-        """요청 언어에 맞는 3줄 요약을 돌려준다. 없으면 description 폴백."""
+        """요청 언어에 맞는 3줄 요약을 돌려준다. 없으면 description 폴백.
+
+        입력: lang — "ko"|"en"|"zh" (그 외는 빈 목록 처리)
+        출력: 최대 3줄 요약 리스트; 해당 언어 요약 없으면
+            [description 또는 repo_full_name] 1줄 폴백
+        결과: 없음 (읽기 전용)
+        """
         key = {"en": self.summary_en, "zh": self.summary_zh, "ko": self.summary_ko}.get(lang)
         lines = list(key) if key else []
         if lines:
@@ -95,4 +101,10 @@ class PushSubscription(Base):
 
     @property
     def keys(self) -> dict[str, str]:
+        """keys_json을 파싱해 dict로 반환한다.
+
+        입력: 없음 (self.keys_json 사용)
+        출력: {"p256dh": ..., "auth": ...} 형태의 dict
+        결과: 없음 (읽기 전용)
+        """
         return json.loads(self.keys_json)

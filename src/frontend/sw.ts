@@ -9,6 +9,9 @@ interface PushPayload {
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
+/** 푸시 수신 시 OS 알림 표시.
+ *  입력: event — PushEvent(페이로드 JSON) / 출력: 없음
+ *  결과: showNotification으로 알림 표시, 클릭 시 data.url로 이동 */
 sw.addEventListener('push', (event: PushEvent) => {
   let data: PushPayload = {
     title: 'SkillRadar',
@@ -31,6 +34,9 @@ sw.addEventListener('push', (event: PushEvent) => {
   );
 });
 
+/** 알림 클릭 시 해당 URL을 새 탭/창에서 연다.
+ *  입력: event — NotificationEvent / 출력: 없음
+ *  결과: notification 닫기 + clients.openWindow */
 sw.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close();
   const url =

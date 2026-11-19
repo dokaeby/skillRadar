@@ -44,18 +44,37 @@ _STRAY_U = re.compile(r"\\u")
 
 
 def _preclean_block(block: str) -> str:
-    """파싱 전: 유효한 \\uXXXX를 실제 문자로 바꾸고 깨진 \\u는 제거한다."""
+    """파싱 전: 유효한 \\uXXXX를 실제 문자로 바꾸고 깨진 \\u는 제거한다.
+
+    입력:
+      - block: str
+    출력: str
+    결과: 없음 (순수 텍스트 처리)
+    """
     block = _VALID_U.sub(lambda m: chr(int(m.group(1), 16)), block)
     return _BAD_U.sub("", block)
 
 
 def _decode_line_text(s: str) -> str:
-    """파싱 후: 문자열에 남은 리터럴 \\uXXXX를 디코딩하고 깨진 \\u는 제거."""
+    """파싱 후: 문자열에 남은 리터럴 \\uXXXX를 디코딩하고 깨진 \\u는 제거.
+
+    입력:
+      - s: str
+    출력: str
+    결과: 없음 (순수 텍스트 처리)
+    """
     s = _LITERAL_U.sub(lambda m: chr(int(m.group(1), 16)), s)
     return _STRAY_U.sub("", s)
 
 
 def _loads_lenient(block: str):
+    """
+
+    입력:
+      - block: str
+    출력: 없음 (None)
+    결과: 없음 (파싱 헬퍼)
+    """
     for candidate in (block, _preclean_block(block)):
         try:
             return json.loads(candidate)
@@ -70,6 +89,13 @@ def _loads_lenient(block: str):
 
 def _extract_json(text: str) -> dict | None:
     # 1) 코드 펜스로 감싼 JSON 우선
+    """
+
+    입력:
+      - text: str
+    출력: dict | None
+    결과: 없음 (파싱 헬퍼)
+    """
     for m in _FENCE.finditer(text or ""):
         data = _loads_lenient(m.group(1))
         if isinstance(data, dict):
@@ -83,7 +109,14 @@ def _extract_json(text: str) -> dict | None:
 
 
 def content_hash(description: str | None, readme: str | None) -> str:
-    """요약 캐시 키. description+README가 같으면 재요약하지 않는다."""
+    """요약 캐시 키. description+README가 같으면 재요약하지 않는다.
+
+    입력:
+      - description: str | None
+      - readme: str | None
+    출력: str
+    결과: 없음 (해시 계산)
+    """
     raw = f"{description or ''}\n---\n{(readme or '')[:3000]}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -106,8 +139,11 @@ _INJECTION_RE = re.compile(
 def sanitize_readme(text: str | None, max_chars: int = 3000) -> str:
     """README를 LLM 입력용으로 정제한다.
 
-    저장소 콘텐츠는 신뢰할 수 없는 입력이므로 프롬프트 인젝션 의심 문구가
-    포함된 줄을 제거하고 길이를 제한한다.
+    입력:
+      - text: str | None
+      - max_chars: int
+    출력: str
+    결과: 없음 (정제 결과 문자열 반환)
     """
     if not text:
         return ""
@@ -116,7 +152,14 @@ def sanitize_readme(text: str | None, max_chars: int = 3000) -> str:
 
 
 def _normalize(data: dict, description: str | None) -> dict[str, list[str]] | None:
-    """LLM 응답을 {en, zh, ko: [3줄]} 형태로 정규화. ko 없으면 en을 번역 대체로 사용."""
+    """LLM 응답을 {en, zh, ko: [3줄]} 형태로 정규화. ko 없으면 en을 번역 대체로 사용.
+
+    입력:
+      - data: dict
+      - description: str | None
+    출력: dict[str, list[str]] | None
+    결과: 없음 (LLM 출력 정규화)
+    """
     out: dict[str, list[str]] = {}
     for key, field_name in (("en", "summary_en"), ("zh", "summary_zh"), ("ko", "summary_ko")):
         lines = data.get(field_name)
@@ -144,7 +187,14 @@ def _normalize(data: dict, description: str | None) -> dict[str, list[str]] | No
 
 
 def fallback_summaries(description: str | None, full_name: str) -> dict[str, list[str]]:
-    """LLM 실패 시 description 원문으로 대체 (3줄 보장)."""
+    """LLM 실패 시 description 원문으로 대체 (3줄 보장).
+
+    입력:
+      - description: str | None
+      - full_name: str
+    출력: dict[str, list[str]]
+    결과: 없음 (description 기반 폴백 생성)
+    """
     base = (description or full_name).strip()
     lines = [base]
     while len(lines) < 3:
@@ -158,6 +208,13 @@ _google_broken = False  # 연속 실패 시 Google을 건너뛰는 서킷 브레
 
 
 def _get_translate_sem() -> "asyncio.Semaphore":
+    """
+
+    입력:
+      - 없음
+    출력: 'asyncio.Semaphore'
+    결과: 없음 (세마포어 지연 생성)
+    """
     global _translate_sem
     if _translate_sem is None:
         _translate_sem = asyncio.Semaphore(1)
@@ -165,6 +222,13 @@ def _get_translate_sem() -> "asyncio.Semaphore":
 
 
 async def _try_google(text: str) -> str:
+    """
+
+    입력:
+      - text: str
+    출력: str
+    결과: Google 번역 API 호출. 실패 시 빈 문자열
+    """
     global _google_broken
     from deep_translator import GoogleTranslator
 
@@ -186,7 +250,13 @@ async def _try_google(text: str) -> str:
 
 
 async def translate_ko(text: str) -> str:
-    """Google 번역 우선, rate limit/차단 시 MyMemory 폴백. 최종 실패 시 원문 반환."""
+    """Google 번역 우선, rate limit/차단 시 MyMemory 폴백. 최종 실패 시 원문 반환.
+
+    입력:
+      - text: str
+    출력: str
+    결과: 없음 (번역 결과 문자열)
+    """
     global _google_broken
     if not _google_broken:
         try:
@@ -208,7 +278,13 @@ async def translate_ko(text: str) -> str:
 
 
 async def translate_lines_ko(lines: list[str]) -> list[str]:
-    """3줄 요약을 한 번의 번역 호출로 변환. 줄 수가 어긋나면 개별 번역."""
+    """3줄 요약을 한 번의 번역 호출로 변환. 줄 수가 어긋나면 개별 번역.
+
+    입력:
+      - lines: list[str]
+    출력: list[str]
+    결과: 없음 (행별 번역 결과 리스트)
+    """
     joined = "\n".join(lines)
     out = await translate_ko(joined)
     parts = [p.strip() for p in out.split("\n") if p.strip()]
@@ -220,7 +296,14 @@ async def translate_lines_ko(lines: list[str]) -> list[str]:
 async def fallback_summaries_async(
     description: str | None, full_name: str
 ) -> dict[str, list[str]]:
-    """LLM 실패 시 description 폴백 + 한국어는 Google 번역으로 변환."""
+    """LLM 실패 시 description 폴백 + 한국어는 Google 번역으로 변환.
+
+    입력:
+      - description: str | None
+      - full_name: str
+    출력: dict[str, list[str]]
+    결과: 없음 (폴백 요약 dict)
+    """
     fb = fallback_summaries(description, full_name)
     fb["ko"] = await translate_lines_ko(fb["en"])
     return fb
@@ -230,6 +313,13 @@ _llm_sem: "asyncio.Semaphore | None" = None
 
 
 def _get_llm_sem() -> "asyncio.Semaphore":
+    """
+
+    입력:
+      - 없음
+    출력: 'asyncio.Semaphore'
+    결과: 없음 (세마포어 지연 생성)
+    """
     global _llm_sem
     if _llm_sem is None:
         _llm_sem = asyncio.Semaphore(1)
@@ -248,6 +338,18 @@ class Summarizer:
         timeout: float = 60.0,
         min_interval: float = 0.0,
     ) -> None:
+        """
+
+        입력:
+          - api_key: str
+          - base_url: str
+          - model: str
+          - client: httpx.AsyncClient | None
+          - timeout: float
+          - min_interval: float
+        출력: 없음
+        결과: Summarizer 인스턴스 상태 초기화 (LLM/번역 클라이언트)
+        """
         self._api_key = api_key
         self._model = model
         self._client = client or httpx.AsyncClient(timeout=timeout)
@@ -255,12 +357,28 @@ class Summarizer:
         self._min_interval = min_interval
 
     async def aclose(self) -> None:
+        """
+
+        입력:
+          - 없음
+        출력: 없음
+        결과: httpx 클라이언트 연결 해제
+        """
         await self._client.aclose()
 
     async def summarize(
         self, platform: str, full_name: str, description: str | None, readme: str
     ) -> dict[str, list[str]]:
-        """3개 언어 3줄 요약을 반환. 파싱 실패 시 1회 재시도, 그래도 실패하면 폴백."""
+        """3개 언어 3줄 요약을 반환. 파싱 실패 시 1회 재시도, 그래도 실패하면 폴백.
+
+        입력:
+          - platform: str
+          - full_name: str
+          - description: str | None
+          - readme: str
+        출력: dict[str, list[str]]
+        결과: LLM으로 3개 언어 요약 생성 + 한국어 번역. 실패 시 폴백
+        """
         prompt = PROMPT.format(
             platform=platform,
             name=full_name,

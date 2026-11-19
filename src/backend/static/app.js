@@ -33,6 +33,8 @@
         trending: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
         arrow: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>',
     };
+    /** 테마 아이콘(해/달) 표시를 현재 다크모드 상태에 맞춰 전환한다. */
+    /** 입력: 없음 / 출력: 없음 / 결과: DOM 클래스 토글 */
     function syncThemeIcon() {
         const dark = isDark();
         themeIconSun.classList.toggle('hidden', dark);
@@ -51,6 +53,8 @@
         localStorage.setItem('sr-theme', dark ? 'dark' : 'light');
         syncThemeIcon();
     });
+    /** 언어 토글 버튼 중 활성 버튼 스타일을 갱신한다. */
+    /** 입력: btn — 클릭된 언어 버튼 / 출력: 없음 / 결과: 버튼 CSS 클래스 토글 */
     function setActiveLang(btn) {
         document.querySelectorAll('#langToggle button').forEach((b) => {
             const active = b === btn;
@@ -82,6 +86,8 @@
         state.date = dateSelect.value;
         void loadTrending();
     });
+    /** 로딩 중 카드 자리표시자(skeleton)를 그리드에 렌더링한다. */
+    /** 입력: 없음 / 출력: 없음 / 결과: grid.innerHTML 교체 */
     function skeletons() {
         grid.innerHTML = Array.from({ length: 6 }, () => `
       <div class="card rounded-2xl p-5">
@@ -97,11 +103,15 @@
       </div>`).join('');
         empty.classList.add('hidden');
     }
+    /** star 수를 읽기 쉬운 형태로 축약한다. */
+    /** 입력: n — star 수 / 출력: "1.2k" 등 문자열 / 결과: 없음 */
     function fmtStars(n) {
         if (n >= 1000)
             return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
         return String(n);
     }
+    /** SPDX 라이선스 ID를 짧은 표시용 문자열로 변환한다. */
+    /** 입력: license — SPDX ID / 출력: 축약 문자열 / 결과: 없음 */
     function licenseShort(license) {
         const map = {
             'Apache-2.0': 'Apache-2.0', 'MIT': 'MIT', 'BSD-2-Clause': 'BSD-2',
@@ -122,12 +132,16 @@
             return `BSD-${b[1]}`;
         return license.length > 12 ? license.slice(0, 12) : license;
     }
+    /** HTML 특수문자를 이스케이프해 XSS를 방지한다. */
+    /** 입력: s — 임의 값 / 출력: 이스케이프된 문자열 / 결과: 없음 */
     function escapeHtml(s) {
         const map = {
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
         };
         return String(s ?? '').replace(/[&<>"']/g, (c) => map[c]);
     }
+    /** TrendingItem 1개를 카드 HTML 문자열로 렌더링한다. */
+    /** 입력: item — API 응답 아이템 / 출력: 카드 HTML / 결과: 없음 */
     function renderCard(item) {
         const topics = (item.topics || []).slice(0, 4)
             .map((t) => `<span class="topic-chip text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.07] text-slate-600 dark:text-slate-400">${escapeHtml(t)}</span>`)
@@ -177,6 +191,8 @@
     const PLATFORM_DOT = {
         claude: 'bg-claude', chatgpt: 'bg-chatgpt', gemini: 'bg-gemini',
     };
+    /** 토픽 검색 결과를 그리드에 렌더링한다. */
+    /** 입력: data — /api/topic-repos 응답 / 출력: 없음 / 결과: grid/empty DOM 갱신 */
     function renderTopicRepos(data) {
         if (!data.items || !data.items.length) {
             grid.innerHTML = '';
@@ -191,6 +207,8 @@
             .join('');
         updatedAt.textContent = '';
     }
+    /** 인기 토픽 목록을 API에서 가져와 사이드바에 렌더링한다. */
+    /** 입력: 없음 / 출력: Promise<void> / 결과: topicList DOM 갱신, allTopics 저장 */
     async function loadTopics() {
         try {
             const res = await fetch('/api/topics');
@@ -219,6 +237,8 @@
             topicList.innerHTML = '<p class="text-xs text-slate-500 px-2 py-3">주제를 불러오지 못했습니다</p>';
         }
     }
+    /** 선택된 토픽 버튼에 활성 스타일을 적용한다. */
+    /** 입력: topic — 선택 토픽명 또는 null / 출력: 없음 / 결과: 버튼 CSS 토글 */
     function markActiveTopic(topic) {
         topicList.querySelectorAll('.topic-btn').forEach((b) => {
             const active = b.dataset.topic === topic;
@@ -230,6 +250,8 @@
             b.classList.toggle('dark:text-slate-400', !active);
         });
     }
+    /** 토픽 상세 보기로 전환하고 관련 데이터를 로드한다. */
+    /** 입력: topic — 토픽명, count — 저장소 수 / 출력: 없음 / 결과: state 갱신 + API 로드 트리거 */
     function selectTopic(topic, count) {
         state.topic = topic;
         state.topicPlatform = 'all';
@@ -242,6 +264,8 @@
         void loadTopicRepos();
         void loadRelatedTopics(topic);
     }
+    /** 선택 토픽과 공기반으로 등장한 관련 토픽을 로드·렌더링한다. */
+    /** 입력: topic — 기준 토픽 / 출력: Promise<void> / 결과: relatedTopics DOM 갱신 */
     async function loadRelatedTopics(topic) {
         relatedTopics.innerHTML = '';
         try {
@@ -269,6 +293,8 @@
             /* 관련 주제 실패는 무시 */
         }
     }
+    /** 토픽 상세에서 트렌딩 뷰로 복귀한다. */
+    /** 입력: 없음 / 출력: 없음 / 결과: state 초기화 + loadTrending 호출 */
     function clearTopic() {
         state.topic = null;
         markActiveTopic(null);
@@ -276,6 +302,8 @@
         trendBar.classList.remove('hidden');
         void loadTrending();
     }
+    /** 토픽 뷰의 플랫폼 탭 활성 상태를 동기화한다. */
+    /** 입력: 없음 / 출력: 없음 / 결과: 탭 CSS 클래스 토글 */
     function syncTopicPlatformTabs() {
         topicPlatformTabs.querySelectorAll('button').forEach((b) => {
             const active = b.dataset.tplatform === state.topicPlatform;
@@ -287,6 +315,8 @@
             b.classList.toggle('dark:text-slate-400', !active);
         });
     }
+    /** 현재 토픽/플랫폼/언어로 저장소 목록을 로드한다. */
+    /** 입력: 없음 / 출력: Promise<void> / 결과: grid에 결과 렌더링 */
     async function loadTopicRepos() {
         if (!state.topic)
             return;
@@ -313,6 +343,8 @@
     });
     const emptyTitle = document.getElementById('emptyTitle');
     const emptyDesc = document.getElementById('emptyDesc');
+    /** 플랫폼별 수집 가능 날짜 목록을 로드해 셀렉트를 채운다. */
+    /** 입력: 없음 / 출력: Promise<void> / 결과: dateSelect 옵션 + state.date 갱신 */
     async function loadDates() {
         try {
             const res = await fetch(`/api/dates?platform=${state.platform}`);
@@ -330,6 +362,8 @@
             /* 날짜 목록 실패는 무시 */
         }
     }
+    /** 현재 플랫폼/언어/날짜의 트렌딩 목록을 로드·렌더링한다. */
+    /** 입력: 없음 / 출력: Promise<void> / 결과: grid DOM 갱신 */
     async function loadTrending() {
         skeletons();
         try {

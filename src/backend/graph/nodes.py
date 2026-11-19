@@ -59,8 +59,14 @@ def configure_runtime(
 ) -> None:
     """run_platform_pipeline이 호출해 해당 플랫폼 노드의 의존성을 주입한다.
 
-    summary_cache: async (full_name, description, sanitized_readme) ->
-    SummaryResult | dict | tuple | None — 히트 시 LLM 호출을 건너뛴다.
+    입력:
+      - platform: str
+      - settings: Settings | None
+      - github: GitHubLike | None
+      - summarizer: SummarizerLike | None
+      - summary_cache: Any
+    출력: 없음
+    결과: 해당 플랫폼 런타임 의존성 등록 (노드들이 참조)
     """
     _runtime[platform] = _RuntimeDeps(
         settings=settings,
@@ -71,28 +77,72 @@ def configure_runtime(
 
 
 def reset_runtime(platform: str) -> None:
+    """
+
+    입력:
+      - platform: str
+    출력: 없음
+    결과: 등록된 런타임 의존성 해제
+    """
     _runtime.pop(platform, None)
 
 
 def _platform_of(state: Any) -> str:
+    """
+
+    입력:
+      - state: Any
+    출력: str
+    결과: 없음 (상태에서 플랫폼명 추출)
+    """
     return str(_state_get(state, "platform", "claude") or "claude")
 
 
 def _deps(state: Any) -> _RuntimeDeps:
+    """
+
+    입력:
+      - state: Any
+    출력: _RuntimeDeps
+    결과: 없음 (런타임 의존성 조회)
+    """
     return _runtime.get(_platform_of(state)) or _RuntimeDeps()
 
 
 def _settings(state: Any) -> Settings:
+    """
+
+    입력:
+      - state: Any
+    출력: Settings
+    결과: 없음 (설정 조회)
+    """
     return _deps(state).settings or get_settings()
 
 
 def _state_get(state: Any, key: str, default: Any = None) -> Any:
+    """
+
+    입력:
+      - state: Any
+      - key: str
+      - default: Any
+    출력: Any
+    결과: 없음 (상태 값 조회 헬퍼)
+    """
     if isinstance(state, dict):
         return state.get(key, default)
     return getattr(state, key, default)
 
 
 def _hit_to_raw(hit: RepoHit) -> RepoRaw:
+    """
+
+    입력:
+      - hit: RepoHit
+    출력: RepoRaw
+    결과: 없음 (RepoHit→RepoRaw 변환)
+    """
     return RepoRaw(
         full_name=hit.full_name,
         html_url=hit.html_url,
@@ -107,6 +157,13 @@ def _hit_to_raw(hit: RepoHit) -> RepoRaw:
 
 
 def _summarizer(state: Any) -> SummarizerLike:
+    """
+
+    입력:
+      - state: Any
+    출력: SummarizerLike
+    결과: 없음 (Summarizer 조회 헬퍼)
+    """
     deps = _deps(state)
     if deps.summarizer is not None:
         return deps.summarizer
@@ -119,7 +176,13 @@ def _summarizer(state: Any) -> SummarizerLike:
 
 
 async def collect(state: Any) -> dict[str, Any]:
-    """queries로 GitHub 검색 → RepoRaw 수집. full_name 중복은 stars 최대값 유지."""
+    """queries로 GitHub 검색 → RepoRaw 수집. full_name 중복은 stars 최대값 유지.
+
+    입력:
+      - state: Any
+    출력: dict[str, Any]
+    결과: GitHub 검색 쿼리로 저장소 수집 → repos_raw 갱신
+    """
     errors = list(_state_get(state, "errors", []) or [])
     queries = list(_state_get(state, "queries", []) or [])
     settings = _settings(state)
@@ -153,7 +216,13 @@ async def collect(state: Any) -> dict[str, Any]:
 
 
 async def dedupe_filter(state: Any) -> dict[str, Any]:
-    """archived/fork 제외 + stars 상위 10개만 유지 (_TOP_K)."""
+    """archived/fork 제외 + stars 상위 10개만 유지 (_TOP_K).
+
+    입력:
+      - state: Any
+    출력: dict[str, Any]
+    결과: 중복/fork/archived/라이선스 불명 제외 → repos_clean 갱신 + 제외 사유 기록
+    """
     repos: list[RepoRaw] = list(_state_get(state, "repos_raw", []) or [])
     before = len(repos)
     kept = [r for r in repos if not (r.archived or r.fork)]
@@ -167,7 +236,13 @@ async def dedupe_filter(state: Any) -> dict[str, Any]:
 
 
 async def sanitize(state: Any) -> dict[str, Any]:
-    """각 repo의 README를 가져와 정제. 동시성 5, 노드당 GitHubClient 1개."""
+    """각 repo의 README를 가져와 정제. 동시성 5, 노드당 GitHubClient 1개.
+
+    입력:
+      - state: Any
+    출력: dict[str, Any]
+    결과: README 정제(인젝션 의심 구문 제거 등) → sanitized_readme 갱신
+    """
     repos: list[RepoRaw] = list(_state_get(state, "repos_raw", []) or [])
     errors = list(_state_get(state, "errors", []) or [])
     settings = _settings(state)
@@ -181,6 +256,13 @@ async def sanitize(state: Any) -> dict[str, Any]:
     sem = asyncio.Semaphore(5)
 
     async def _one(repo: RepoRaw) -> RepoClean:
+        """
+
+        입력:
+          - repo: RepoRaw
+        출력: RepoClean
+        결과: 없음 (내부 헬퍼)
+        """
         async with sem:
             try:
                 raw = await client.fetch_readme(repo.full_name)
@@ -205,6 +287,14 @@ async def sanitize(state: Any) -> dict[str, Any]:
 
 
 async def _classify_repo(clean: RepoClean, settings: Settings) -> Classification:
+    """
+
+    입력:
+      - clean: RepoClean
+      - settings: Settings
+    출력: Classification
+    결과: 없음 (LLM 분류 래퍼)
+    """
     from backend import llm_tasks  # 지연 임포트: 통합 전에도 그래프 구성 가능
 
     return await llm_tasks.classify_repo(
@@ -219,7 +309,13 @@ async def _classify_repo(clean: RepoClean, settings: Settings) -> Classification
 
 
 async def classify(state: Any) -> dict[str, Any]:
-    """taxonomy 분류. LLM 비활성 시 전부 other/0.0."""
+    """taxonomy 분류. LLM 비활성 시 전부 other/0.0.
+
+    입력:
+      - state: Any
+    출력: dict[str, Any]
+    결과: LLM taxonomy 분류 → classifications 갱신
+    """
     cleans: list[RepoClean] = list(_state_get(state, "repos_clean", []) or [])
     prev: dict[str, Classification] = dict(
         _state_get(state, "classifications", {}) or {}
@@ -235,6 +331,13 @@ async def classify(state: Any) -> dict[str, Any]:
     sem = asyncio.Semaphore(4)
 
     async def _one(clean: RepoClean) -> tuple[str, Classification | None]:
+        """
+
+        입력:
+          - clean: RepoClean
+        출력: tuple[str, Classification | None]
+        결과: 없음 (내부 헬퍼)
+        """
         async with sem:
             try:
                 cls = await _classify_repo(clean, settings)
@@ -255,6 +358,15 @@ async def classify(state: Any) -> dict[str, Any]:
 async def _summarize_one(
     summarizer: SummarizerLike, platform: str, clean: RepoClean
 ) -> SummaryResult:
+    """
+
+    입력:
+      - summarizer: SummarizerLike
+      - platform: str
+      - clean: RepoClean
+    출력: SummaryResult
+    결과: 없음 (LLM 요약 래퍼)
+    """
     try:
         data = await summarizer.summarize(
             platform,
@@ -270,7 +382,13 @@ async def _summarize_one(
 
 
 async def summarize(state: Any) -> dict[str, Any]:
-    """repo별 3개 언어 요약 생성. 실패 시 폴백 + status='failed'."""
+    """repo별 3개 언어 요약 생성. 실패 시 폴백 + status='failed'.
+
+    입력:
+      - state: Any
+    출력: dict[str, Any]
+    결과: LLM 3개 언어 요약 → summaries 갱신 (content_hash 캐시 활용)
+    """
     cleans: list[RepoClean] = list(_state_get(state, "repos_clean", []) or [])
     prev: dict[str, SummaryResult] = dict(_state_get(state, "summaries", {}) or {})
     errors = list(_state_get(state, "errors", []) or [])
@@ -280,6 +398,13 @@ async def summarize(state: Any) -> dict[str, Any]:
     sem = asyncio.Semaphore(5)
 
     def _cached_result(cached: Any) -> SummaryResult | None:
+        """
+
+        입력:
+          - cached: Any
+        출력: SummaryResult | None
+        결과: 없음 (캐시 조회 헬퍼)
+        """
         if cached is None:
             return None
         if isinstance(cached, SummaryResult):
@@ -293,6 +418,13 @@ async def summarize(state: Any) -> dict[str, Any]:
             return None
 
     async def _one(clean: RepoClean) -> tuple[str, SummaryResult]:
+        """
+
+        입력:
+          - clean: RepoClean
+        출력: tuple[str, SummaryResult]
+        결과: 없음 (내부 헬퍼)
+        """
         async with sem:
             try:
                 summary_cache = _deps(state).summary_cache
@@ -331,6 +463,15 @@ async def summarize(state: Any) -> dict[str, Any]:
 async def _verify_summary(
     clean: RepoClean, summary: SummaryResult, settings: Settings
 ) -> bool:
+    """
+
+    입력:
+      - clean: RepoClean
+      - summary: SummaryResult
+      - settings: Settings
+    출력: bool
+    결과: 없음 (judge 검증 래퍼)
+    """
     from backend import llm_tasks
 
     return await llm_tasks.verify_summary(
@@ -343,7 +484,13 @@ async def _verify_summary(
 
 
 async def verify(state: Any) -> dict[str, Any]:
-    """요약 충실도 검증. 실패 시 재요약 최대 2회, 초과 시 status='unverified'."""
+    """요약 충실도 검증. 실패 시 재요약 최대 2회, 초과 시 status='unverified'.
+
+    입력:
+      - state: Any
+    출력: dict[str, Any]
+    결과: 요약 충실도 검증 → 실패 시 status="unverified"/"failed" 갱신
+    """
     cleans: list[RepoClean] = list(_state_get(state, "repos_clean", []) or [])
     summaries: dict[str, SummaryResult] = dict(_state_get(state, "summaries", {}) or {})
     retries: dict[str, int] = dict(_state_get(state, "retries", {}) or {})
@@ -359,6 +506,13 @@ async def verify(state: Any) -> dict[str, Any]:
     sem = asyncio.Semaphore(4)
 
     async def _one(clean: RepoClean) -> None:
+        """
+
+        입력:
+          - clean: RepoClean
+        출력: 없음
+        결과: 없음 (내부 헬퍼)
+        """
         name = clean.repo.full_name
         summary = summaries.get(name)
         if summary is None:
@@ -395,7 +549,13 @@ async def verify(state: Any) -> dict[str, Any]:
 
 
 async def rank(state: Any) -> dict[str, Any]:
-    """rank_score 계산 후 상위 10개를 ranked에 저장."""
+    """rank_score 계산 후 상위 10개를 ranked에 저장.
+
+    입력:
+      - state: Any
+    출력: dict[str, Any]
+    결과: 랭킹 점수 계산 → ranked 갱신
+    """
     cleans: list[RepoClean] = list(_state_get(state, "repos_clean", []) or [])
     summaries: dict[str, SummaryResult] = dict(_state_get(state, "summaries", {}) or {})
     classifications: dict[str, Classification] = dict(
@@ -431,7 +591,13 @@ async def rank(state: Any) -> dict[str, Any]:
 
 
 async def related(state: Any) -> dict[str, Any]:
-    """토픽 공기반 관련 주제. 같은 스냅샷 내 repo 토픽 교집합, LLM 호출 없음."""
+    """토픽 공기반 관련 주제. 같은 스냅샷 내 repo 토픽 교집합, LLM 호출 없음.
+
+    입력:
+      - state: Any
+    출력: dict[str, Any]
+    결과: 토픽 공기반 관련 주제 추천 → related_topics 갱신
+    """
     cleans: list[RepoClean] = list(_state_get(state, "repos_clean", []) or [])
 
     topic_repos: dict[str, list[str]] = {}

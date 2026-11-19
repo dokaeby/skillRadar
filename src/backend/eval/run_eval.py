@@ -31,7 +31,15 @@ REPO_URL = "https://api.github.com/repos/{full_name}"
 async def _fetch_repo_meta(
     client: httpx.AsyncClient, full_name: str, token: str
 ) -> tuple[str | None, list[str]]:
-    """저장소 메타데이터(description, topics)를 가져온다. 실패 시 (None, [])."""
+    """저장소 메타데이터(description, topics)를 가져온다. 실패 시 (None, []).
+
+    입력:
+      - client: httpx.AsyncClient
+      - full_name: str
+      - token: str
+    출력: tuple[str | None, list[str]]
+    결과: 없음 (GitHub API 읽기)
+    """
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -49,7 +57,13 @@ async def _fetch_repo_meta(
 
 
 async def run(settings: Settings) -> tuple[dict[str, str], list[dict], dict]:
-    """데이터셋 전체를 평가하고 (predicted, rows, metrics)를 반환한다."""
+    """데이터셋 전체를 평가하고 (predicted, rows, metrics)를 반환한다.
+
+    입력:
+      - settings: Settings
+    출력: tuple[dict[str, str], list[dict], dict]
+    결과: 데이터셋 전체 분류 평가. LLM/GitHub API 호출 발생
+    """
     token = settings.github_token.get_secret_value()
     api_key = settings.llm_api_key.get_secret_value()
     entries = json.loads(DATASET_PATH.read_text(encoding="utf-8"))
@@ -95,7 +109,14 @@ async def run(settings: Settings) -> tuple[dict[str, str], list[dict], dict]:
 
 
 def write_report(rows: list[dict], metrics: dict) -> Path:
-    """평가 결과를 docs/experiments/{date}-eval-baseline.md에 기록한다."""
+    """평가 결과를 docs/experiments/{date}-eval-baseline.md에 기록한다.
+
+    입력:
+      - rows: list[dict]
+      - metrics: dict
+    출력: Path
+    결과: 평가 리포트 md 파일을 docs/experiments/에 생성
+    """
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(ZoneInfo("Asia/Seoul")).isoformat(timespec="seconds")
     path = REPORT_DIR / f"{today_kst()}-eval-baseline.md"
@@ -128,6 +149,13 @@ def write_report(rows: list[dict], metrics: dict) -> Path:
 
 
 async def main() -> int:
+    """
+
+    입력:
+      - 없음
+    출력: int
+    결과: 평가 실행 + 리포트 출력. 종료 코드 반환
+    """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     settings = Settings()
     if not settings.llm_enabled:

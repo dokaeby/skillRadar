@@ -11,7 +11,13 @@ from backend.models import Base
 
 
 def make_engine(database_url: str):
-    """DATABASE_URL로 SQLAlchemy 엔진을 만든다. postgres는 psycopg 드라이버를 쓴다."""
+    """DATABASE_URL로 SQLAlchemy 엔진을 만든다. postgres는 psycopg 드라이버를 쓴다.
+
+    입력: database_url — sqlite:/// 또는 postgresql:// 접속 문자열
+    출력: 생성된 SQLAlchemy Engine (풀 설정 포함)
+    결과: postgres일 때 psycopg prepared statement를 비활성화해
+        Supabase pooler의 DuplicatePreparedStatement를 방지
+    """
     url = database_url
     if url.startswith("postgres://"):
         url = "postgresql+psycopg://" + url[len("postgres://") :]
@@ -37,22 +43,43 @@ def make_engine(database_url: str):
 
 @lru_cache
 def get_engine():
+    """설정의 database_url로 엔진을 만든다. 프로세스당 1회 캐시.
+
+    입력: 없음 (get_settings()에서 읽음)
+    출력: 캐시된 SQLAlchemy Engine
+    결과: 최초 호출 시에만 make_engine 실행
+    """
     return make_engine(get_settings().database_url)
 
 
 def init_db(engine=None) -> None:
-    """테이블이 없으면 만든다. Render 무료 플랜 재시작 대응용 자동 마이그레이션."""
+    """테이블이 없으면 만든다. Render 무료 플랜 재시작 대응용 자동 마이그레이션.
+
+    입력: engine — 사용할 Engine (None이면 get_engine())
+    출력: 없음
+    결과: Base.metadata의 모든 테이블이 DB에 생성·커밋됨
+    """
     eng = engine or get_engine()
     Base.metadata.create_all(eng)
 
 
 def session_factory() -> sessionmaker[Session]:
-    """앱/스케줄러가 공유하는 세션 팩토리."""
+    """앱/스케줄러가 공유하는 세션 팩토리.
+
+    입력: 없음
+    출력: get_engine()에 바인딩된 sessionmaker
+    결과: expire_on_commit=False로 커밋 후 객체 만료 방지
+    """
     return sessionmaker(bind=get_engine(), expire_on_commit=False)
 
 
 def get_session() -> Generator[Session]:
-    """FastAPI Depends용 세션. 요청이 끝나면 닫는다."""
+    """FastAPI Depends용 세션. 요청이 끝나면 닫는다.
+
+    입력: 없음
+    출력: yield된 DB Session (의존성 주입으로 사용)
+    결과: 요청 종료 시 세션 close 보장
+    """
     session = session_factory()()
     try:
         yield session

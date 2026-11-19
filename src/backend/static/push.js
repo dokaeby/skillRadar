@@ -8,11 +8,15 @@
     const pushSupported = 'serviceWorker' in navigator &&
         'PushManager' in window &&
         'Notification' in window;
+    /** iOS 기기 여부를 판별한다. */
+    /** 입력: 없음 / 출력: boolean / 결과: 없음 */
     function isIos() {
         const ua = navigator.userAgent;
         return (/iphone|ipad|ipod/i.test(ua) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
     }
+    /** 푸시 미지원 브라우저/기기에 안내 alert를 표시한다. */
+    /** 입력: 없음 / 출력: 없음 / 결과: alert 표시 */
     function showUnsupportedGuide() {
         if (isIos()) {
             alert('아이폰에서는 홈 화면에 추가한 앱에서만 알림을 받을 수 있습니다.\n\n' +
@@ -24,17 +28,23 @@
             alert('이 브라우저는 웹 푸시를 지원하지 않습니다. Chrome을 사용해주세요.');
         }
     }
+    /** base64url VAPID 공개키를 Uint8Array로 변환한다. */
+    /** 입력: base64 — base64url 문자열 / 출력: Uint8Array / 결과: 없음 */
     function urlBase64ToUint8Array(base64) {
         const padding = '='.repeat((4 - (base64.length % 4)) % 4);
         const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
         const raw = atob(b64);
         return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
     }
+    /** 현재 등록된 푸시 구독을 반환한다. */
+    /** 입력: 없음 / 출력: PushSubscription|null / 결과: 없음 */
     async function currentSub() {
         const reg = await navigator.serviceWorker.ready;
         return reg.pushManager.getSubscription();
     }
     const pushBtnLabel = document.getElementById('pushBtnLabel');
+    /** 구독 상태에 맞게 버튼 라벨/스타일을 갱신한다. */
+    /** 입력: 없음 / 출력: Promise<void> / 결과: 버튼 DOM 갱신 */
     async function refreshBtn() {
         const sub = await currentSub().catch(() => null);
         if (pushBtnLabel)

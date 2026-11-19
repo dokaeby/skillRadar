@@ -14,7 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 def subscribe(session: Session, endpoint: str, keys: dict[str, str]) -> PushSubscription:
-    """구독 정보 upsert. 같은 endpoint는 갱신한다."""
+    """구독 정보 upsert. 같은 endpoint는 갱신한다.
+
+    입력: session — DB 세션; endpoint — 푸시 서비스 엔드포인트 URL;
+        keys — {"p256dh": ..., "auth": ...} 구독 키
+    출력: 저장(또는 갱신)된 PushSubscription 행
+    결과: push_subscriptions 테이블에 커밋됨
+    """
     row = session.execute(
         select(PushSubscription).where(PushSubscription.endpoint == endpoint)
     ).scalar_one_or_none()
@@ -28,6 +34,12 @@ def subscribe(session: Session, endpoint: str, keys: dict[str, str]) -> PushSubs
 
 
 def unsubscribe(session: Session, endpoint: str) -> None:
+    """endpoint 구독을 삭제한다.
+
+    입력: session — DB 세션; endpoint — 삭제할 구독 엔드포인트
+    출력: 없음
+    결과: 해당 행이 push_subscriptions에서 삭제·커밋됨
+    """
     session.execute(delete(PushSubscription).where(PushSubscription.endpoint == endpoint))
     session.commit()
 
@@ -39,7 +51,13 @@ async def send_push(
     body: str,
     url: str = "/",
 ) -> int:
-    """모든 구독자에게 푸시 발송. 성공 건수를 반환한다."""
+    """모든 구독자에게 푸시 발송. 성공 건수를 반환한다.
+
+    입력: session — 구독 조회/삭제용 DB 세션; settings — VAPID 키;
+        title/body/url — 알림 제목·본문·클릭 시 이동 URL
+    출력: 발송 성공한 구독 수 (push 비활성 시 0)
+    결과: 404/410 응답 구독은 만료로 간주해 삭제·커밋
+    """
     if not settings.push_enabled:
         return 0
     from pywebpush import WebPushException, webpush  # 지연 import: 미설치 환경 배려
@@ -72,7 +90,12 @@ async def send_push(
 
 
 async def notify_daily_top(session: Session, settings: Settings) -> int:
-    """수집 완료 후 각 플랫폼 Top1을 푸시로 알린다."""
+    """수집 완료 후 각 플랫폼 Top1을 푸시로 알린다.
+
+    입력: session — 최신 스냅샷 조회용 DB 세션; settings — VAPID 키
+    출력: 전체 발송 성공 건수 합계 (push 비활성·스냅샷 없음 시 0)
+    결과: 플랫폼별 Top1 repo를 제목/본문으로 구독자 전체에 발송
+    """
     if not settings.push_enabled:
         return 0
     latest_date = session.execute(select(Snapshot.collected_date).order_by(Snapshot.collected_date.desc()).limit(1)).scalar()

@@ -23,7 +23,7 @@
 - LangChain 1.x (init_chat_model, 구조화 출력, 도구, 문서 처리)
 - LangGraph (StateGraph, 체크포인터는 SQLite로 시작, 필요 시 Postgres)
 - LangSmith (트레이싱, 데이터셋, 평가, 실험)
-- 저장: Supabase PostgreSQL, 캐시는 Redis
+- 저장: Supabase PostgreSQL (Redis 캐시는 v1.0.2에서 제거 — content_hash DB 캐시 사용)
 - 품질 도구: pyright(strict), ruff, pytest. mypy는 쓰지 않는다.
 - 실행: Docker(실행 위주), 환경 구분(debug/release). release에서는 디버그 로그를 출력하지 않는다.
 - 선택: Tavily(관련 주제 확장 검색), Ollama 임베딩(의미 검색 단계에서만)

@@ -25,6 +25,13 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    """FastAPI 앱을 조립한다.
+
+    입력: settings — 테스트용 주입 설정 (None이면 get_settings())
+    출력: 라우터·정적파일·lifespan이 연결된 FastAPI 인스턴스
+    결과: app.state에 settings/session_factory/templates 저장,
+        VERCEL env 없을 때만 APScheduler 기동
+    """
     config = settings if settings is not None else get_settings()
     docs = config.app_env == "debug"
 
@@ -56,6 +63,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 def _make_templates():
+    """Jinja2 템플릿 환경을 만든다.
+
+    입력: 없음 (BASE_DIR/templates 사용)
+    출력: autoescape가 켜진 jinja2.Environment
+    결과: index.html 등 템플릿 로드 가능 상태
+    """
     from jinja2 import Environment, FileSystemLoader
 
     return Environment(loader=FileSystemLoader(str(BASE_DIR / "templates")), autoescape=True)

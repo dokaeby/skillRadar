@@ -52,6 +52,15 @@ class SubscribeBody(BaseModel):
 
 
 def _serialize_item(item, lang: str, platform: str | None = None) -> TrendingItem:
+    """
+
+    입력:
+      - item: Any
+      - lang: str
+      - platform: str | None
+    출력: TrendingItem
+    결과: 없음 (읽기 전용 직렬화)
+    """
     return TrendingItem(
         rank=item.rank,
         repo_full_name=item.repo_full_name,
@@ -73,6 +82,15 @@ def _serialize_item(item, lang: str, platform: str | None = None) -> TrendingIte
 def _get_snapshot(
     session: Session, platform: str, collected: date_type
 ) -> Snapshot | None:
+    """
+
+    입력:
+      - session: Session
+      - platform: str
+      - collected: date_type
+    출력: Snapshot | None
+    결과: 없음 (읽기 전용 조회)
+    """
     return session.execute(
         select(Snapshot)
         .where(Snapshot.platform == platform, Snapshot.collected_date == collected)
@@ -87,6 +105,16 @@ async def trending(
     lang: str = "ko",
     session: Session = Depends(get_session),
 ) -> TrendingResponse:
+    """
+
+    입력:
+      - platform: str
+      - date: str | None
+      - lang: str
+      - session: Session
+    출력: TrendingResponse
+    결과: 없음 (DB 읽기)
+    """
     if platform not in PLATFORMS:
         raise HTTPException(status_code=400, detail="platform은 claude|chatgpt|gemini 중 하나")
     if lang not in ("ko", "en", "zh"):
@@ -119,6 +147,14 @@ async def available_dates(
     platform: str = "claude",
     session: Session = Depends(get_session),
 ) -> dict:
+    """
+
+    입력:
+      - platform: str
+      - session: Session
+    출력: dict
+    결과: 없음 (DB 읽기)
+    """
     rows = session.execute(
         select(Snapshot.collected_date)
         .where(Snapshot.platform == platform)
@@ -133,7 +169,13 @@ TOPIC_MAX_RESULTS = 50
 
 
 def _recent_items(session: Session):
-    """최근 TOPIC_WINDOW_DAYS일 스냅샷의 (item, platform) 목록."""
+    """최근 TOPIC_WINDOW_DAYS일 스냅샷의 (item, platform) 목록.
+
+    입력:
+      - session: Session
+    출력: 없음 (None)
+    결과: 없음 (DB 읽기)
+    """
     since = date_type.today() - timedelta(days=TOPIC_WINDOW_DAYS)
     return session.execute(
         select(SnapshotItem, Snapshot.platform)
@@ -144,7 +186,13 @@ def _recent_items(session: Session):
 
 @router.get("/api/topics")
 async def topics(session: Session = Depends(get_session)) -> dict:
-    """최근 수집분에서 등장 횟수가 많은 GitHub 토픽을 관심순으로 반환."""
+    """최근 수집분에서 등장 횟수가 많은 GitHub 토픽을 관심순으로 반환.
+
+    입력:
+      - session: Session
+    출력: dict
+    결과: 없음 (DB 읽기)
+    """
     counts: Counter[str] = Counter()
     for item, _platform in _recent_items(session):
         for topic in set(item.topics or []):
@@ -165,7 +213,17 @@ async def topic_repos(
     limit: int = 10,
     session: Session = Depends(get_session),
 ) -> TrendingResponse:
-    """특정 토픽을 가진 저장소를 스타 순으로 반환 (플랫폼별 필터 가능)."""
+    """특정 토픽을 가진 저장소를 스타 순으로 반환 (플랫폼별 필터 가능).
+
+    입력:
+      - topic: str
+      - platform: str
+      - lang: str
+      - limit: int
+      - session: Session
+    출력: TrendingResponse
+    결과: 없음 (DB 읽기)
+    """
     if not topic or len(topic) > 100:
         raise HTTPException(status_code=400, detail="topic 파라미터가 필요합니다")
     if platform != "all" and platform not in PLATFORMS:
@@ -207,7 +265,14 @@ async def related_topics(
     topic: str,
     session: Session = Depends(get_session),
 ) -> dict:
-    """특정 토픽과 함께 등장한 다른 토픽을 공기반 점수 순으로 반환."""
+    """특정 토픽과 함께 등장한 다른 토픽을 공기반 점수 순으로 반환.
+
+    입력:
+      - topic: str
+      - session: Session
+    출력: dict
+    결과: 없음 (DB 읽기)
+    """
     if not topic or len(topic) > 100:
         raise HTTPException(status_code=400, detail="topic 파라미터가 필요합니다")
     co: Counter[str] = Counter()
@@ -231,7 +296,16 @@ async def admin_refresh(
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict:
-    """Bearer ADMIN_TOKEN으로 수동 수집 실행."""
+    """Bearer ADMIN_TOKEN으로 수동 수집 실행.
+
+    입력:
+      - request: Request
+      - authorization: str | None
+      - session: Session
+      - settings: Settings
+    출력: dict
+    결과: 3개 플랫폼 전체 수집 파이프라인 실행 후 Top1 푸시 발송. 완료까지 대기
+    """
     token = ""
     if authorization and authorization.startswith("Bearer "):
         token = authorization[7:]
@@ -250,6 +324,14 @@ async def push_subscribe(
     body: SubscribeBody,
     session: Session = Depends(get_session),
 ) -> dict:
+    """
+
+    입력:
+      - body: SubscribeBody
+      - session: Session
+    출력: dict
+    결과: push_subscriptions에 구독 upsert 후 커밋
+    """
     from backend.push import subscribe
 
     subscribe(session, body.endpoint, body.keys)
@@ -261,6 +343,14 @@ async def push_unsubscribe(
     body: SubscribeBody,
     session: Session = Depends(get_session),
 ) -> dict:
+    """
+
+    입력:
+      - body: SubscribeBody
+      - session: Session
+    출력: dict
+    결과: 해당 endpoint 구독 삭제 후 커밋
+    """
     from backend.push import unsubscribe
 
     unsubscribe(session, body.endpoint)
@@ -269,21 +359,49 @@ async def push_unsubscribe(
 
 @router.get("/api/push/vapid-key")
 async def vapid_key(settings: Settings = Depends(get_settings)) -> dict:
+    """
+
+    입력:
+      - settings: Settings
+    출력: dict
+    결과: 없음 (공개키 조회)
+    """
     return {"key": settings.vapid_public_key if settings.push_enabled else ""}
 
 
 @router.get("/manifest.json")
 async def manifest() -> FileResponse:
+    """
+
+    입력:
+      - 없음
+    출력: FileResponse
+    결과: 없음 (정적 파일 응답)
+    """
     return FileResponse(BASE_DIR / "static" / "manifest.json", media_type="application/manifest+json")
 
 
 @router.get("/sw.js")
 async def service_worker() -> FileResponse:
+    """
+
+    입력:
+      - 없음
+    출력: FileResponse
+    결과: 없음 (서비스워커 파일 응답)
+    """
     return FileResponse(BASE_DIR / "static" / "sw.js", media_type="application/javascript")
 
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
+    """
+
+    입력:
+      - request: Request
+    출력: HTMLResponse
+    결과: 없음 (템플릿 렌더 응답)
+    """
     settings: Settings = request.app.state.settings
     template = request.app.state.templates.get_template("index.html")
     return HTMLResponse(

@@ -30,8 +30,15 @@ async def collect_platform(
 ) -> Snapshot:
     """플랫폼 하나를 수집해 스냅샷으로 저장한다.
 
-    이미 같은 날짜 스냅샷이 있으면 항목을 교체(멱등 재수집)한다.
-    개별 항목의 LLM/README 실패는 해당 항목만 폴백 처리하고 수집은 계속한다.
+    입력:
+      - platform: str
+      - session: Session
+      - settings: Settings
+      - github: GitHubLike | None
+      - summarizer: SummarizerLike | None
+      - collected_date: date | None
+    출력: Snapshot
+    결과: Snapshot을 DB에 저장(멱등 upsert). 반환값은 저장된 Snapshot
     """
     gh = github or GitHubClient(token=settings.github_token.get_secret_value())
     sm = summarizer or (
@@ -51,6 +58,15 @@ async def collect_platform(
         queries = settings.platform_queries().get(platform, [])
 
         async def _cache_lookup(full_name: str, description: str | None, readme: str):
+            """
+
+            입력:
+              - full_name: str
+              - description: str | None
+              - readme: str
+            출력: 없음 (None)
+            결과: 없음 (캐시 조회 헬퍼)
+            """
             hit = _find_cached_summary(
                 session, full_name, content_hash(description, readme)
             )
@@ -138,9 +154,23 @@ async def collect_all(
     platforms: tuple[str, ...] = ("claude", "chatgpt", "gemini"),
 ) -> list[Snapshot]:
     """플랫폼별 수집을 병렬 실행한다. 플랫폼마다 독립 세션을 쓰고,
-    한 플랫폼 실패가 다른 플랫폼을 막지 않는다."""
+
+    입력:
+      - session_factory: sessionmaker[Session]
+      - settings: Settings
+      - platforms: tuple[str, ...]
+    출력: list[Snapshot]
+    결과: 3개 플랫폼을 gather로 병렬 수집. 성공/실패와 무관하게 Snapshot 리스트 반환
+    """
 
     async def _one(platform: str) -> Snapshot | None:
+        """
+
+        입력:
+          - platform: str
+        출력: Snapshot | None
+        결과: 없음 (내부 헬퍼)
+        """
         session = session_factory()
         try:
             return await collect_platform(platform, session, settings)
@@ -158,7 +188,15 @@ async def collect_all(
 def _previous_stars(
     session: Session, platform: str, collected: date
 ) -> dict[str, int]:
-    """가장 최근 이전 스냅샷의 repo→stars 맵."""
+    """가장 최근 이전 스냅샷의 repo→stars 맵.
+
+    입력:
+      - session: Session
+      - platform: str
+      - collected: date
+    출력: dict[str, int]
+    결과: 없음 (DB 읽기)
+    """
     snap = session.execute(
         select(Snapshot)
         .where(Snapshot.platform == platform, Snapshot.collected_date < collected)
@@ -173,7 +211,15 @@ def _previous_stars(
 def _find_cached_summary(
     session: Session, full_name: str, chash: str
 ) -> tuple[list[str], list[str], list[str]] | None:
-    """같은 repo+같은 content_hash의 이전 요약이 있으면 재사용한다."""
+    """같은 repo+같은 content_hash의 이전 요약이 있으면 재사용한다.
+
+    입력:
+      - session: Session
+      - full_name: str
+      - chash: str
+    출력: tuple[list[str], list[str], list[str]] | None
+    결과: 없음 (content_hash 기반 캐시 조회)
+    """
     row = session.execute(
         select(SnapshotItem)
         .where(SnapshotItem.repo_full_name == full_name, SnapshotItem.content_hash == chash)

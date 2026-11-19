@@ -15,9 +15,23 @@ Taxonomy = Literal[
 class GitHubLike(Protocol):
     """GitHubClient와 테스트 fake가 만족하는 최소 인터페이스."""
 
-    async def search_repositories(self, query: str, per_page: int = 30) -> list["RepoHit"]: ...
-    async def fetch_readme(self, full_name: str) -> str: ...
-    async def aclose(self) -> None: ...
+    async def search_repositories(
+        self, query: str, per_page: int = 30
+    ) -> list["RepoHit"]:
+        """입력: query — 검색 쿼리; per_page — 최대 결과 수
+        출력: RepoHit 리스트
+        결과: 없음 (인터페이스 선언)"""
+        ...
+
+    async def fetch_readme(self, full_name: str) -> str:
+        """입력: full_name — "owner/repo" 저장소명
+        출력: README 텍스트 (최대 3000자), 실패 시 ""
+        결과: 없음 (인터페이스 선언)"""
+        ...
+
+    async def aclose(self) -> None:
+        """입력: 없음 / 출력: 없음 / 결과: httpx 클라이언트 연결 해제"""
+        ...
 
 
 class SummarizerLike(Protocol):
@@ -25,8 +39,16 @@ class SummarizerLike(Protocol):
 
     async def summarize(
         self, platform: str, full_name: str, description: str | None, readme: str
-    ) -> dict[str, list[str]]: ...
-    async def aclose(self) -> None: ...
+    ) -> dict[str, list[str]]:
+        """입력: platform — 대상 플랫폼; full_name — 저장소명;
+            description — GitHub 설명; readme — 정제된 README
+        출력: {"en": [...], "zh": [...], "ko": [...]} 3줄 요약 dict
+        결과: 없음 (인터페이스 선언)"""
+        ...
+
+    async def aclose(self) -> None:
+        """입력: 없음 / 출력: 없음 / 결과: httpx 클라이언트 연결 해제"""
+        ...
 
 
 class RepoRaw(BaseModel):

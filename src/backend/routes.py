@@ -304,6 +304,7 @@ async def related_topics(
 async def admin_refresh(
     request: Request,
     authorization: str | None = Header(default=None),
+    force: bool = False,
     settings: Settings = Depends(get_settings),
 ) -> dict:
     """Bearer ADMIN_TOKEN으로 수동 수집 실행.
@@ -311,9 +312,11 @@ async def admin_refresh(
     입력:
       - request: Request
       - authorization: str | None
+      - force: bool — True면 같은 날짜 기존 스냅샷 무시하고 재수집
       - settings: Settings
     출력: dict
-    결과: 3개 플랫폼 전체 수집 파이프라인 실행 후 Top1 푸시 발송. 완료까지 대기
+    결과: 3개 플랫폼 수집 파이프라인 실행 후 Top1 푸시 발송. 완료까지 대기.
+        같은 날짜 스냅샷이 있으면 스킵(?force=true로 강제 재수집)
     """
     token = ""
     if authorization and authorization.startswith("Bearer "):
@@ -324,7 +327,7 @@ async def admin_refresh(
     if not token or not any(hmac.compare_digest(token, t) for t in allowed):
         raise HTTPException(status_code=401, detail="unauthorized")
 
-    await run_daily_collect(request.app.state.session_factory, settings)
+    await run_daily_collect(request.app.state.session_factory, settings, force=force)
     return {"status": "ok"}
 
 

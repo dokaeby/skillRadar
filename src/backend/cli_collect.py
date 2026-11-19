@@ -21,7 +21,7 @@ async def main() -> None:
     settings = get_settings()
     init_db()
     factory = session_factory()
-    await collect_all(factory, settings)
+    await collect_all(factory, settings, force=True)
     session = factory()
     try:
         await notify_daily_top(session, settings)

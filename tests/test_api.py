@@ -141,7 +141,7 @@ def test_admin_refresh_requires_token(client):
 def test_admin_refresh_accepts_admin_and_cron_token(client, monkeypatch):
     c, _ = client
 
-    async def fake_collect(factory, settings):
+    async def fake_collect(factory, settings, force=False):
         return []
 
     monkeypatch.setattr("backend.routes.run_daily_collect", fake_collect)

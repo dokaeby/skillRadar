@@ -7,28 +7,43 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.collector import collect_all
-from backend.config import Settings
-from backend.push import notify_daily_top
+from backend.config import PLATFORMS, Settings
+from backend.models import Snapshot
+from backend.push import notify_daily_top, send_push
 
 logger = logging.getLogger(__name__)
 
 _scheduler: AsyncIOScheduler | None = None
 
 
-async def run_daily_collect(session_factory: sessionmaker[Session], settings: Settings) -> None:
+async def run_daily_collect(
+    session_factory: sessionmaker[Session], settings: Settings, force: bool = False
+) -> list[Snapshot]:
     """수집 + 푸시 알림. 스케줄러와 수동 refresh가 공용으로 쓴다.
 
     입력: session_factory — 플랫폼별 독립 세션을 만드는 팩토리;
-        settings — GitHub/LLM/VAPID 설정
-    출력: 없음
-    결과: 3개 플랫폼 스냅샷 저장 후 Top1 푸시 발송
+        settings — GitHub/LLM/VAPID 설정; force — 같은 날짜 재수집 여부
+    출력: list[Snapshot] — 플랫폼별 스냅샷 (스킵 시 기존 스냅샷)
+    결과: 플랫폼 스냅샷 수집 후 실패 플랫폼이 있으면 실패 푸시 발송,
+        이어서 Top1 푸시 발송
     """
-    await collect_all(session_factory, settings)
+    snapshots = await collect_all(session_factory, settings, force=force)
     session = session_factory()
     try:
+        done = {snap.platform for snap in snapshots}
+        failed = [p for p in PLATFORMS if p not in done]
+        if failed:
+            await send_push(
+                session,
+                settings,
+                title="SkillRadar 수집 실패",
+                body="수집 실패: " + ", ".join(p.capitalize() for p in failed),
+                url="/",
+            )
         await notify_daily_top(session, settings)
     finally:
         session.close()
+    return snapshots
 
 
 def start_scheduler(

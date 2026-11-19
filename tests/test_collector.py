@@ -225,3 +225,30 @@ async def test_collect_all_runs_platforms_in_parallel(tmp_path, settings, monkey
     assert elapsed < 0.55  # 직렬이면 ~0.8s
     assert len(results) == 3  # 실패한 bad만 제외
     engine.dispose()
+
+@pytest.mark.asyncio
+async def test_collect_skips_existing_same_day_snapshot(db_session, settings):
+    """같은 날짜 스냅샷이 있으면 파이프라인을 실행하지 않고 기존 스냅샷을 반환한다."""
+    q = settings.platform_queries()["claude"][0]
+    gh = FakeGitHub({q: [_hit("a/one", 10)]})
+    first = await collect_platform(
+        "claude", db_session, settings, github=gh,
+        summarizer=FakeSummarizer(), collected_date=date(2026, 11, 18),
+    )
+    calls_before = len(gh.readme_calls)
+
+    # 두 번째 호출: force 없이 같은 날짜 → 스킵되어 GitHub 호출 없음
+    second = await collect_platform(
+        "claude", db_session, settings, github=gh,
+        summarizer=FakeSummarizer(), collected_date=date(2026, 11, 18),
+    )
+    assert second.id == first.id
+    assert len(gh.readme_calls) == calls_before
+
+    # force=True → 재수집되어 GitHub 호출 발생
+    await collect_platform(
+        "claude", db_session, settings, github=gh,
+        summarizer=FakeSummarizer(), collected_date=date(2026, 11, 18), force=True,
+    )
+    assert len(gh.readme_calls) > calls_before
+

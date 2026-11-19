@@ -24,6 +24,7 @@ async def collect_platform(
     github: GitHubLike | None = None,
     summarizer: SummarizerLike | None = None,
     collected_date: date | None = None,
+    force: bool = False,
 ) -> Snapshot:
     """플랫폼 하나를 수집해 스냅샷으로 저장한다.
 
@@ -34,6 +35,7 @@ async def collect_platform(
       - github: GitHubLike | None
       - summarizer: SummarizerLike | None
       - collected_date: date | None
+      - force: bool — True면 같은 날짜 기존 스냅샷이 있어도 재수집
     출력: Snapshot
     결과: Snapshot을 DB에 저장(멱등 upsert). 반환값은 저장된 Snapshot
     """
@@ -51,6 +53,18 @@ async def collect_platform(
     own_gh = github is None
     own_sm = summarizer is None and sm is not None
     try:
+        collected = collected_date or date.fromisoformat(today_kst())
+        # 같은 날짜 스냅샷이 이미 있으면 재수집하지 않는다 (cron 중복 실행 방지).
+        # force=True(수동 refresh)면 기존 스냅샷을 삭제하고 다시 수집한다.
+        existing = session.execute(
+            select(Snapshot).where(
+                Snapshot.platform == platform, Snapshot.collected_date == collected
+            )
+        ).scalar_one_or_none()
+        if existing is not None and not force:
+            logger.info("%s %s 이미 수집됨 — 스킵", platform, collected)
+            return existing
+
         # 1) LangGraph 큐레이터 파이프라인 실행
         #    (collect→dedupe→sanitize→classify→summarize→verify→rank)
         queries = settings.platform_queries().get(platform, [])
@@ -82,16 +96,10 @@ async def collect_platform(
         ranked_repos = state.ranked
 
         # 2) 직전 스냅샷의 star 수 (오늘 증가량 계산용)
-        collected = collected_date or date.fromisoformat(today_kst())
         prev_stars = _previous_stars(session, platform, collected)
 
-        # 3) 기존 스냅샷 재수집이면 삭제 후 재생성 (멱등)
-        existing = session.execute(
-            select(Snapshot).where(
-                Snapshot.platform == platform, Snapshot.collected_date == collected
-            )
-        ).scalar_one_or_none()
-        if existing:
+        # 3) force 재수집이면 기존 스냅샷 삭제 후 재생성 (멱등)
+        if existing is not None:
             session.delete(existing)
             session.flush()
 
@@ -152,6 +160,7 @@ async def collect_all(
     session_factory: sessionmaker[Session],
     settings: Settings,
     platforms: tuple[str, ...] = ("claude", "chatgpt", "gemini"),
+    force: bool = False,
 ) -> list[Snapshot]:
     """플랫폼별 수집을 병렬 실행한다. 플랫폼마다 독립 세션을 쓴다.
 
@@ -159,6 +168,7 @@ async def collect_all(
       - session_factory: sessionmaker[Session]
       - settings: Settings
       - platforms: tuple[str, ...]
+      - force: bool — True면 같은 날짜 기존 스냅샷 무시하고 재수집
     출력: list[Snapshot]
     결과: 플랫폼을 gather로 병렬 수집. 실패한 플랫폼은 건너뛰고 성공분만 반환
     """
@@ -173,7 +183,7 @@ async def collect_all(
         """
         session = session_factory()
         try:
-            return await collect_platform(platform, session, settings)
+            return await collect_platform(platform, session, settings, force=force)
         except Exception as exc:  # noqa: BLE001 - 플랫폼별 격리
             logger.exception("%s 수집 실패: %s", platform, exc)
             session.rollback()

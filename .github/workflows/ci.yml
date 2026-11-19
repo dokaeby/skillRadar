@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pyright pytest pytest-asyncio
+      - name: Ruff
+        run: ruff check src tests
+      - name: Pyright
+        run: pyright
+      - name: Pytest
+        run: pytest tests -q
+        env:
+          PYTHONPATH: src
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
+
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      eval: ${{ steps.filter.outputs.eval }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            eval:
+              - 'src/backend/llm_tasks.py'
+              - 'src/backend/summarizer.py'
+              - 'src/backend/graph/**'
+              - 'src/backend/eval/**'
+              - '.github/workflows/ci.yml'
+
+  eval-gate:
+    needs: changes
+    if: >-
+      vars.EVAL_CI_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+       needs.changes.outputs.eval == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Eval regression gate
+        run: python -m backend.eval.run_eval --check
+        env:
+          PYTHONPATH: src
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_JUDGE_MODEL: ${{ secrets.LLM_JUDGE_MODEL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATABASE_URL: sqlite:///./ci.db
+          ADMIN_TOKEN: ci
+          VAPID_PUBLIC_KEY: ci
+          VAPID_PRIVATE_KEY: ci
+          VAPID_SUBJECT: mailto:ci@example.com
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: docs/experiments/
+          if-no-files-found: ignore

@@ -5,8 +5,7 @@
     "tests"
   ],
   "exclude": [
-    "**/node_modules",
-    "frontend"
+    "**/node_modules"
   ],
   "venvPath": ".",
   "venv": ".venv",

@@ -18,7 +18,7 @@
 | stars_today 증감 | `collector.py` `_previous_stars` | 직전 스냅샷 대비 |
 | 한국어 요약 | `summarizer.py` + `translate_lines_ko` | LLM ko 우선, 한글 없으면 Google 번역 |
 | Supabase Postgres 저장 | `db.py`, `models.py` | SQLAlchemy 2.x ORM |
-| FastAPI 제공 + 반응형 UI | `routes.py`, `frontend/` | PWA/Web Push 포함 |
+| FastAPI 제공 + 반응형 UI | `routes.py`, `src/frontend/` | PWA/Web Push 포함 |
 | 주제 추천 (관심순 + 주제별 Top10) | `/api/topics`, `/api/topic-repos` | v1.0.1 신규 |
 | 비밀값 환경변수 관리 | `config.py` (pydantic-settings), `.env` gitignore | 코드/로그 미노출 |
 | GitHub rate limit 대응 | `github_client.py` 지수 backoff + Retry-After | 403/429/5xx 재시도 |

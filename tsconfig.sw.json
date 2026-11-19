@@ -7,7 +7,7 @@
     "noEmitOnError": true,
     "skipLibCheck": true,
     "outDir": "src/backend/static",
-    "rootDir": "frontend/src"
+    "rootDir": "src/frontend"
   },
-  "include": ["frontend/src/sw.ts"]
+  "include": ["src/frontend/sw.ts"]
 }

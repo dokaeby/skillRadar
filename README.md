@@ -15,12 +15,12 @@ LLM이 생성한 3줄 요약(한글·EN·中文)을 카드 UI로 보여주는 �
   최종 실패 시 description 폴백. 항목별 예외 격리.
 - **화면**: 플랫폼 탭 3개, 언어 토글(한글/EN/中文), 날짜 선택, 반응형 카드 그리드,
   다크모드, Web Push 알림 구독
-  - 프론트엔드 소스는 `frontend/src/*.ts` (TypeScript) → `npm run build`로
+  - 프론트엔드 소스는 `src/frontend/*.ts` (TypeScript) → `npm run build`로
     `src/backend/static/*.js`에 컴파일. 프레임워크 없이 바닐라 TS + Tailwind CDN
 - **API**:
   - `GET /api/trending?platform=claude|chatgpt|gemini&date=YYYY-MM-DD&lang=ko|en|zh`
   - `GET /api/dates?platform=...`
-  - `POST /api/admin/refresh` (Bearer `ADMIN_TOKEN`)
+  - `GET|POST /api/admin/refresh` (Bearer `ADMIN_TOKEN` 또는 `CRON_SECRET`)
   - `POST /api/push/subscribe`, `POST /api/push/unsubscribe`, `GET /api/push/vapid-key`
 
 ## 로컬 실행

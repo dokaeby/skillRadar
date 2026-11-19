@@ -14,14 +14,15 @@ from typing import Any
 from backend.config import Settings, get_settings
 from backend.github_client import GitHubClient, RepoHit
 from backend.schemas import (
+    CachedRepo,
     Classification,
     GitHubLike,
     RankedRepo,
     RelatedTopic,
+    RepoCacheFn,
     RepoClean,
     RepoRaw,
     SummarizerLike,
-    SummaryCacheFn,
     SummaryResult,
 )
 from backend.summarizer import (
@@ -43,7 +44,7 @@ class _RuntimeDeps:
     settings: Settings | None = None
     github: GitHubLike | None = None
     summarizer: SummarizerLike | None = None
-    summary_cache: SummaryCacheFn | None = None
+    repo_cache: RepoCacheFn | None = None
 
 
 # collect_all이 플랫폼별 파이프라인을 동시에 실행하므로 의존성은
@@ -57,7 +58,7 @@ def configure_runtime(
     settings: Settings | None = None,
     github: GitHubLike | None = None,
     summarizer: SummarizerLike | None = None,
-    summary_cache: SummaryCacheFn | None = None,
+    repo_cache: RepoCacheFn | None = None,
 ) -> None:
     """run_platform_pipeline이 호출해 해당 플랫폼 노드의 의존성을 주입한다.
 
@@ -66,7 +67,7 @@ def configure_runtime(
       - settings: Settings | None
       - github: GitHubLike | None
       - summarizer: SummarizerLike | None
-      - summary_cache: SummaryCacheFn | None
+      - repo_cache: RepoCacheFn | None
     출력: 없음
     결과: 해당 플랫폼 런타임 의존성 등록 (노드들이 참조)
     """
@@ -74,7 +75,7 @@ def configure_runtime(
         settings=settings,
         github=github,
         summarizer=summarizer,
-        summary_cache=summary_cache,
+        repo_cache=repo_cache,
     )
 
 
@@ -272,6 +273,29 @@ async def sanitize(state: CuratorState) -> dict[str, Any]:
     return {"repos_clean": list(clean), "errors": errors}
 
 
+async def _cached_classification(
+    state: CuratorState, clean: RepoClean
+) -> Classification | None:
+    """동일 content_hash의 이전 분류 결과를 캐시에서 반환한다. 없으면 None."""
+    cache = _deps(state).repo_cache
+    if cache is None:
+        return None
+    try:
+        hit = await cache(
+            clean.repo.full_name, clean.repo.description, clean.sanitized_readme
+        )
+    except Exception:
+        return None
+    if not hit or not hit.get("taxonomy"):
+        return None
+    try:
+        return Classification.model_validate(
+            {"label": hit["taxonomy"], "confidence": hit.get("confidence") or 0.0}
+        )
+    except Exception:
+        return None
+
+
 async def _classify_repo(clean: RepoClean, settings: Settings) -> Classification:
     """
 
@@ -324,7 +348,9 @@ async def classify(state: CuratorState) -> dict[str, Any]:
         """
         async with sem:
             try:
-                cls = await _classify_repo(clean, settings)
+                cls = await _cached_classification(state, clean)
+                if cls is None:
+                    cls = await _classify_repo(clean, settings)
                 return clean.repo.full_name, cls
             except Exception as exc:  # noqa: BLE001
                 logger.warning("classify 실패 %s: %s", clean.repo.full_name, exc)
@@ -381,12 +407,19 @@ async def summarize(state: CuratorState) -> dict[str, Any]:
 
     sem = asyncio.Semaphore(5)
 
-    def _cached_result(cached: dict[str, list[str]] | None) -> SummaryResult | None:
-        """캐시 히트 dict를 SummaryResult로 변환한다. 실패 시 None."""
-        if cached is None:
+    def _cached_result(cached: CachedRepo | None) -> SummaryResult | None:
+        """캐시 히트 레코드를 SummaryResult로 변환한다. 실패 시 None."""
+        if cached is None or not cached.get("en"):
             return None
         try:
-            return SummaryResult(status="ok", **cached)
+            return SummaryResult.model_validate(
+                {
+                    "status": cached.get("status") or "ok",
+                    "en": cached.get("en") or [],
+                    "zh": cached.get("zh") or [],
+                    "ko": cached.get("ko") or [],
+                }
+            )
         except Exception:
             return None
 
@@ -400,10 +433,10 @@ async def summarize(state: CuratorState) -> dict[str, Any]:
         """
         async with sem:
             try:
-                summary_cache = _deps(state).summary_cache
-                if summary_cache is not None:
+                repo_cache = _deps(state).repo_cache
+                if repo_cache is not None:
                     try:
-                        cached = await summary_cache(
+                        cached = await repo_cache(
                             clean.repo.full_name,
                             clean.repo.description,
                             clean.sanitized_readme,
@@ -454,6 +487,20 @@ async def _verify_summary(
     )
 
 
+async def _was_verified(state: CuratorState, clean: RepoClean) -> bool:
+    """동일 내용(content_hash)이 이전 실행에서 검증 통과(status=ok)했는지 확인한다."""
+    cache = _deps(state).repo_cache
+    if cache is None:
+        return False
+    try:
+        hit = await cache(
+            clean.repo.full_name, clean.repo.description, clean.sanitized_readme
+        )
+    except Exception:
+        return False
+    return bool(hit and hit.get("status") == "ok")
+
+
 async def verify(state: CuratorState) -> dict[str, Any]:
     """요약 충실도 검증. 실패 시 재요약 최대 2회, 초과 시 status='unverified'.
 
@@ -485,7 +532,11 @@ async def verify(state: CuratorState) -> dict[str, Any]:
         """
         name = clean.repo.full_name
         summary = summaries.get(name)
-        if summary is None:
+        # failed/unverified는 종결 상태 — 재검증·재요약 루프로 LLM을 낭비하지 않는다
+        if summary is None or summary.status != "ok":
+            return
+        # 동일 content_hash로 이전 실행에서 검증을 통과한 요약은 재검증하지 않는다
+        if await _was_verified(state, clean):
             return
         try:
             async with sem:

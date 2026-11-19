@@ -11,7 +11,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from backend.config import Settings
-from backend.schemas import GitHubLike, SummarizerLike, SummaryCacheFn
+from backend.schemas import GitHubLike, RepoCacheFn, SummarizerLike
 
 from . import nodes
 from .state import CuratorState
@@ -80,20 +80,20 @@ async def run_platform_pipeline(
     settings: Settings,
     github: GitHubLike | None = None,
     summarizer: SummarizerLike | None = None,
-    summary_cache: SummaryCacheFn | None = None,
+    repo_cache: RepoCacheFn | None = None,
 ) -> CuratorState:
     """한 플랫폼의 전체 큐레이션 파이프라인을 실행하고 최종 상태를 반환한다.
 
     입력: platform — "claude"|"chatgpt"|"gemini"; queries — GitHub 검색 쿼리;
-        settings/github/summarizer/summary_cache — 노드 의존성 주입(선택)
+        settings/github/summarizer/repo_cache — 노드 의존성 주입(선택)
     출력: ranked/related_topics까지 채워진 최종 CuratorState
     결과: 해당 플랫폼 키로 런타임 의존성을 등록 후 실행, 종료 시 해제.
-        summary_cache 히트 시 해당 repo의 LLM 요약을 건너뛴다.
+        repo_cache 히트 시 해당 repo의 LLM 분류·요약·검증을 건너뛴다.
     """
     nodes.configure_runtime(
         platform,
         settings=settings, github=github, summarizer=summarizer,
-        summary_cache=summary_cache,
+        repo_cache=repo_cache,
     )
     try:
         # LangSmith 트레이싱: 설정 시에만 env를 켜고 실행 후 원복한다.

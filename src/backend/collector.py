@@ -11,7 +11,7 @@ from backend.config import Settings
 from backend.github_client import GitHubClient, stars_delta, today_kst
 from backend.graph.pipeline import run_platform_pipeline
 from backend.models import Snapshot, SnapshotItem
-from backend.schemas import GitHubLike, SummarizerLike
+from backend.schemas import CachedRepo, GitHubLike, SummarizerLike
 from backend.summarizer import Summarizer, content_hash
 
 logger = logging.getLogger(__name__)
@@ -69,29 +69,35 @@ async def collect_platform(
         #    (collect→dedupe→sanitize→classify→summarize→verify→rank)
         queries = settings.platform_queries().get(platform, [])
 
-        async def _cache_lookup(
+        async def _repo_cache(
             full_name: str, description: str | None, readme: str
-        ) -> dict[str, list[str]] | None:
-            """
+        ) -> CachedRepo | None:
+            """동일 content_hash의 이전 수집 레코드를 DB에서 조회한다.
 
             입력:
               - full_name: str
               - description: str | None
               - readme: str
-            출력: {"en": [...], "zh": [...], "ko": [...]} 캐시 히트 또는 None
-            결과: 히트 시 LLM 호출 없이 재사용 가능한 요약 dict 반환
+            출력: CachedRepo — 요약 3개 언어 + taxonomy + 상태, 미스 시 None
+            결과: 히트 시 LLM 분류·요약·검증 호출을 건너뛴다
             """
-            hit = _find_cached_summary(
+            row = _find_cached_repo(
                 session, full_name, content_hash(description, readme)
             )
-            if hit is None:
+            if row is None:
                 return None
-            en, zh, ko = hit
-            return {"en": en, "zh": zh, "ko": ko}
+            return {
+                "en": row.summary_en,
+                "zh": row.summary_zh,
+                "ko": row.summary_ko,
+                "taxonomy": row.taxonomy,
+                "confidence": row.taxonomy_confidence,
+                "status": row.summary_status,
+            }
 
         state = await run_platform_pipeline(
             platform, queries, settings, github=gh, summarizer=sm,
-            summary_cache=_cache_lookup,
+            repo_cache=_repo_cache,
         )
         ranked_repos = state.ranked
 
@@ -113,9 +119,9 @@ async def collect_platform(
             hit = rr.clean.repo
             summ = rr.summary
             chash = content_hash(hit.description, rr.clean.sanitized_readme)
-            cached = _find_cached_summary(session, hit.full_name, chash)
-            if cached:
-                en, zh, ko = cached
+            row = _find_cached_repo(session, hit.full_name, chash)
+            if row is not None:
+                en, zh, ko = row.summary_en, row.summary_zh, row.summary_ko
             else:
                 en, zh, ko = summ.en, summ.zh, summ.ko
             items.append(
@@ -218,17 +224,15 @@ def _previous_stars(
     return {item.repo_full_name: item.stars for item in snap.items}
 
 
-def _find_cached_summary(
-    session: Session, full_name: str, chash: str
-) -> tuple[list[str], list[str], list[str]] | None:
-    """같은 repo+같은 content_hash의 이전 요약이 있으면 재사용한다.
+def _find_cached_repo(session: Session, full_name: str, chash: str) -> SnapshotItem | None:
+    """같은 repo+같은 content_hash의 이전 수집 레코드를 반환한다.
 
     입력:
       - session: Session
       - full_name: str
       - chash: str
-    출력: tuple[list[str], list[str], list[str]] | None
-    결과: 없음 (content_hash 기반 캐시 조회)
+    출력: SnapshotItem | None — 3개 언어 요약이 모두 있는 최신 행
+    결과: content_hash 기반 캐시 조회 (분류·요약·검증 재사용)
     """
     row = session.execute(
         select(SnapshotItem)
@@ -239,4 +243,4 @@ def _find_cached_summary(
     ).scalar_one_or_none()
     if row is None or row.summary_en is None or row.summary_zh is None or row.summary_ko is None:
         return None
-    return row.summary_en, row.summary_zh, row.summary_ko
+    return row

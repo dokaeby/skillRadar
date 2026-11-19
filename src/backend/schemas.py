@@ -1,7 +1,7 @@
 """큐레이터 파이프라인 Pydantic 스키마 (AGENTS.md §6 핵심 모델)."""
 
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol, TypedDict
 
 if TYPE_CHECKING:
     from backend.github_client import RepoHit
@@ -12,10 +12,19 @@ Taxonomy = Literal[
     "agents", "mcp", "skills", "plugins", "devtools", "automation", "data", "other"
 ]
 
-# summary_cache 콜백: (full_name, description, readme) → {"en","zh","ko"} 또는 None
-SummaryCacheFn = Callable[
-    [str, str | None, str], Awaitable[dict[str, list[str]] | None]
-]
+class CachedRepo(TypedDict):
+    """content_hash 캐시 히트 레코드. 없는 필드는 None."""
+
+    en: list[str] | None
+    zh: list[str] | None
+    ko: list[str] | None
+    taxonomy: str | None
+    confidence: float | None
+    status: str | None
+
+
+# repo_cache 콜백: (full_name, description, readme) → CachedRepo 또는 None
+RepoCacheFn = Callable[[str, str | None, str], Awaitable["CachedRepo | None"]]
 
 
 class GitHubLike(Protocol):

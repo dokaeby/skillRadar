@@ -12,6 +12,8 @@
 - **함수 주석**: 전 모듈 함수에 입력/출력/결과 독스트링(JSDoc) 추가.
 - **운영 버그 수정**: Supabase pooler `DuplicatePreparedStatement`(psycopg prepared statement 비활성화), 플랫폼 동시 수집 시 런타임 의존성 race 분리.
 - **리팩토링**: 미사용 `judge_summary`·`build_pipeline`·`translate_fallback` 플래그·`stars_today` 상태필드 제거, `langchain`/`python-dotenv` 미사용 의존성 제거, nodes 상태 접근을 `CuratorState` 타입으로 정리, routes 검증/타입 보강.
+- **수집 실패 알림 + 중복 수집 방지**: 전 플랫폼 수집 실패 시 Web Push 알림, 같은 날짜 스냅샷 존재 시 스킵(`?force=true`로 재수집).
+- **content_hash 캐시 확장**: `SummaryCacheFn`→`RepoCacheFn`으로 분류·요약·검증 3개 노드가 동일 해시의 이전 레코드를 재사용. verify는 `status!='ok'` 요약과 이미 검증 통과한 캐시 히트를 스킵해 LLM 호출 절감.
 
 ## 구현됨
 
@@ -24,7 +26,7 @@
 | 프롬프트 인젝션 sanitize | `summarizer.py` `sanitize_readme` | 의심 문구 라인 제거 + 길이 제한 |
 | LLM 구조화 출력 Pydantic 검증 | `summarizer.py` `LLMSummary` | 3언어 × 3줄 스키마 강제 |
 | 요약 재시도(최대 3회) + description 폴백 | `summarizer.py` | 파싱 실패/호출 실패 모두 폴백 |
-| 요약 캐시 (content_hash) | `collector.py` `_find_cached_summary` | 동일 repo+콘텐츠 재요약 방지 (Redis 대체) |
+| content_hash 캐시 (분류·요약·검증) | `collector.py` `_find_cached_repo` → `RepoCacheFn` | 동일 repo+콘텐츠면 LLM 호출 0회 |
 | stars_today 증감 | `collector.py` `_previous_stars` | 직전 스냅샷 대비 |
 | 한국어 요약 | `summarizer.py` + `translate_lines_ko` | LLM ko 우선, 한글 없으면 Google 번역 |
 | Supabase Postgres 저장 | `db.py`, `models.py` | SQLAlchemy 2.x ORM, psycopg prepared statement 비활성화 |
@@ -68,13 +70,13 @@
 | ETag/조건부 요청 | GitHub Search API는 ETag 미지원 — Contents API에만 부분 적용 가능 |
 | Docker 이미지 | 현재 Vercel 서버리스 배포, Render 설정만 존재 |
 | pyright strict | 파일별 `# pyright: strict` 점진 적용 여지 |
-| 수집 시간 단축 | 수동 refresh ~222초로 Vercel 300초 제한에 근접 — 429 재시도 증가 시 초과 위험 |
+| 수집 시간 단축 | 캐시 미스(신규/변경 repo) 시 여전히 ~222초 — LLM rate limit(~15 RPM)이 병목. 캐시 히트 시 플랫폼당 ~6초 (claude 1개 실측) |
 
 ## 다음 권장 순서
 
 1. AGENTS.md §0 전제 항목 확정 (사용자/배포 형태) — 현재 "공개 서비스 + Vercel"로 간주
 2. LangSmith API 키 발급 시 트레이싱·평가 실험 활성화
-3. 수집 소요 시간 모니터링 — 300초 초과 시 플랫폼별 분할 또는 함수 타임아웃 조정 검토
+3. 수집 소요 시간 모니터링 — 캐시 미스 시 ~222초로 300초 제한에 근접. 캐시 히트 일수록 ~수십 초로 단축됨을 실측 확인
 
 ## 알려진 이슈
 

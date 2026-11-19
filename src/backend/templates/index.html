@@ -123,7 +123,7 @@ tailwind.config = {
       <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-claude via-chatgpt to-gemini flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-black/30 ring-1 ring-white/20">SR</div>
       <div>
         <h1 class="font-bold text-[17px] leading-tight tracking-tight">SkillRadar</h1>
-        <p class="text-[11px] text-slate-500 dark:text-slate-500">AI skill · plugin trending</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-500" data-i18n="subtitle">AI skill · plugin trending</p>
       </div>
     </div>
 
@@ -154,12 +154,40 @@ tailwind.config = {
       <button data-platform="chatgpt" class="px-3 py-1.5 rounded-md text-[#0b7a5c] dark:text-chatgpt">ChatGPT</button>
       <button data-platform="gemini" class="px-3 py-1.5 rounded-md text-[#2b63d9] dark:text-gemini">Gemini</button>
     </nav>
-    <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500 ml-auto">
-      <span>기준일</span>
+    <nav class="flex gap-1 text-xs font-semibold border-l border-slate-200 dark:border-white/10 pl-4" id="periodTabs">
+      <button data-period="daily" class="px-2.5 py-1.5 rounded-md bg-slate-200/70 dark:bg-white/[.08] text-slate-800 dark:text-slate-200 tab-active" data-i18n="periodDaily">일간</button>
+      <button data-period="week" class="px-2.5 py-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" data-i18n="periodWeek">주간</button>
+      <button data-period="month" class="px-2.5 py-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" data-i18n="periodMonth">월간</button>
+    </nav>
+    <div id="dateLabelWrap" class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500 ml-auto">
+      <span data-i18n="dateLabel">기준일</span>
       <select id="dateSelect" class="bg-white dark:bg-white/[.04] border border-slate-200 dark:border-white/10 rounded-md px-2 py-1 text-xs text-slate-600 dark:text-slate-300"></select>
     </div>
   </div>
 </header>
+
+<!-- 필터 바 -->
+<div id="filterBar" class="max-w-7xl mx-auto px-4 pt-3 flex items-center gap-4 flex-wrap">
+  <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
+    <span data-i18n="filterTax">분류</span>
+    <select id="taxSelect" class="bg-white dark:bg-white/[.04] border border-slate-200 dark:border-white/10 rounded-md px-2 py-1 text-xs text-slate-600 dark:text-slate-300">
+      <option value="all" data-i18n="filterTaxAll">전체</option>
+      <option value="agents">agents</option>
+      <option value="mcp">mcp</option>
+      <option value="skills">skills</option>
+      <option value="plugins">plugins</option>
+      <option value="devtools">devtools</option>
+      <option value="automation">automation</option>
+      <option value="data">data</option>
+      <option value="other">other</option>
+    </select>
+  </label>
+  <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500 flex-1 min-w-[160px] max-w-xs">
+    <span data-i18n="filterMinStars" class="shrink-0">최소 스타</span>
+    <input id="minStars" type="range" min="0" max="50000" step="500" value="0" class="flex-1 accent-blue-500">
+    <span id="minStarsLabel" class="w-10 text-right font-semibold text-slate-600 dark:text-slate-300">0</span>
+  </label>
+</div>
 
 <div class="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
 
@@ -167,8 +195,8 @@ tailwind.config = {
   <aside class="lg:w-60 shrink-0">
     <div class="lg:sticky lg:top-[104px]">
       <div class="flex items-center justify-between mb-2 px-1">
-        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500">관심 주제</h2>
-        <span class="text-[10px] text-slate-500 dark:text-slate-600">최근 30일</span>
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500" data-i18n="topicsTitle">관심 주제</h2>
+        <span class="text-[10px] text-slate-500 dark:text-slate-600" data-i18n="topicsWindow">최근 30일</span>
       </div>
       <div id="topicList" class="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 -mx-1 px-1">
         <div class="skeleton h-8 w-32 lg:w-full rounded-lg shrink-0"></div>
@@ -186,7 +214,7 @@ tailwind.config = {
     <div id="topicHeader" class="hidden mb-4">
       <button id="topicBack" class="text-xs text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 mb-2 inline-flex items-center gap-1 transition-colors">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        트렌딩으로 돌아가기
+        <span data-i18n="backToTrending">트렌딩으로 돌아가기</span>
       </button>
       <div class="flex items-center gap-3 flex-wrap">
         <h2 id="topicTitle" class="text-lg font-bold tracking-tight"></h2>
@@ -201,6 +229,7 @@ tailwind.config = {
       <div id="relatedTopics" class="flex gap-1.5 mt-3 flex-wrap"></div>
     </div>
 
+    <div id="repoView" class="hidden"></div>
     <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
     <div id="empty" class="hidden text-center py-24">
       <div class="w-14 h-14 mx-auto rounded-2xl bg-white/[.04] border border-white/10 flex items-center justify-center text-2xl mb-4">📡</div>
@@ -211,11 +240,11 @@ tailwind.config = {
 </div>
 
 <footer class="max-w-7xl mx-auto px-4 pb-8 text-[11px] text-slate-500 dark:text-slate-600 flex justify-between flex-wrap gap-2">
-  <span>GitHub Search API · 일일 Top 10 · LLM 3줄 요약</span>
+  <span data-i18n="footerLeft">GitHub Search API · 일일 Top 10 · LLM 3줄 요약</span>
   <span id="updatedAt"></span>
 </footer>
 
-<script src="/static/app.js?v=5" defer></script>
-<script src="/static/push.js?v=5" defer></script>
+<script src="/static/app.js?v=6" defer></script>
+<script src="/static/push.js?v=6" defer></script>
 </body>
 </html>

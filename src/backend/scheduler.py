@@ -1,6 +1,7 @@
 """매일 KST 06:00 수집 스케줄러 (APScheduler)."""
 
 import logging
+from datetime import date
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -8,8 +9,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.collector import collect_all
 from backend.config import PLATFORMS, Settings
+from backend.github_client import today_kst
 from backend.models import Snapshot
-from backend.push import notify_daily_top, send_push
+from backend.push import notify_daily_top, notify_weekly_digest, send_push
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,9 @@ async def run_daily_collect(
                 url="/",
             )
         await notify_daily_top(session, settings)
+        # KST 월요일 수집분에는 주간 digest 푸시를 추가로 발송한다.
+        if date.fromisoformat(today_kst()).weekday() == 0:
+            await notify_weekly_digest(session, settings)
     finally:
         session.close()
     return snapshots

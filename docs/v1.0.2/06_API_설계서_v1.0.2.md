@@ -30,6 +30,9 @@
 | GET | `/api/topics` | 주제 관심순 목록 | - |
 | GET | `/api/topic-repos` | 토픽별 저장소 랭킹 | - |
 | GET | `/api/related-topics` | 토픽 공기반 관련 주제 | - |
+| GET | `/api/ranking` | 주간/월간 repo 집계 랭킹 (v1.0.2) | - |
+| GET | `/api/repo/{full_name}` | 저장소 상세 (v1.0.2) | - |
+| GET | `/repo/{full_name}` | 저장소 상세 페이지 (SPA 셸) | - |
 | GET/POST | `/api/admin/refresh` | 전체 수집 실행 (GET은 Vercel Cron용) | Bearer ADMIN_TOKEN 또는 CRON_SECRET |
 | POST | `/api/push/subscribe` | Web Push 구독 등록 | - |
 | POST | `/api/push/unsubscribe` | Web Push 구독 해지 | - |
@@ -143,6 +146,22 @@
 ```
 
 최대 10개(`most_common(10)`).
+
+### 3.5a GET /api/ranking (v1.0.2)
+
+| 파라미터 | 타입 | 기본값 | 설명 |
+|---|---|---|---|
+| period | string | week | `week`(7일) / `month`(30일) |
+| platform | string | all | `all` 또는 개별 플랫폼 |
+| lang | string | ko | 요약 언어 |
+
+- repo별 `stars_today` 합계·등장 횟수(`appearances`)를 집계해 정렬 (합계→등장→최신 stars)
+- 응답은 `TrendingResponse`와 동일 구조, item에 `appearances` 포함
+
+### 3.5b GET /api/repo/{full_name} (v1.0.2)
+
+- 가장 최근 스냅샷의 item 전체 + `readme_excerpt` + 3개 언어 `summaries` + 공기반 `related_topics` + `collected_date`/`snapshot_platform`
+- 미수집 repo는 404. `full_name`은 `owner/repo` 형태 (`:path` 파라미터)
 
 ### 3.6 GET/POST /api/admin/refresh
 

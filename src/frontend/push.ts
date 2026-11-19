@@ -1,5 +1,8 @@
 /* Web Push 구독 처리 */
 (() => {
+  /** app.ts가 노출한 번역 함수. 없으면 한국어 폴백. */
+  const T = (window as unknown as { SR_T?: (k: string) => string }).SR_T
+    ?? ((k: string) => ({ pushOn: '알림 받기', pushOff: '알림 중' } as Record<string, string>)[k] ?? k);
   const btn = document.getElementById('pushBtn') as HTMLButtonElement | null;
   if (!btn) return;
   const pushBtn: HTMLButtonElement = btn;
@@ -56,7 +59,7 @@
   /** 입력: 없음 / 출력: Promise<void> / 결과: 버튼 DOM 갱신 */
   async function refreshBtn(): Promise<void> {
     const sub = await currentSub().catch(() => null);
-    if (pushBtnLabel) pushBtnLabel.textContent = sub ? '알림 중' : '알림 받기';
+    if (pushBtnLabel) pushBtnLabel.textContent = sub ? T('pushOff') : T('pushOn');
     pushBtn.classList.toggle('subscribed', !!sub);
   }
 

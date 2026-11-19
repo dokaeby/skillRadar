@@ -1,6 +1,9 @@
 "use strict";
 /* Web Push 구독 처리 */
 (() => {
+    /** app.ts가 노출한 번역 함수. 없으면 한국어 폴백. */
+    const T = window.SR_T
+        ?? ((k) => ({ pushOn: '알림 받기', pushOff: '알림 중' }[k] ?? k));
     const btn = document.getElementById('pushBtn');
     if (!btn)
         return;
@@ -48,7 +51,7 @@
     async function refreshBtn() {
         const sub = await currentSub().catch(() => null);
         if (pushBtnLabel)
-            pushBtnLabel.textContent = sub ? '알림 중' : '알림 받기';
+            pushBtnLabel.textContent = sub ? T('pushOff') : T('pushOn');
         pushBtn.classList.toggle('subscribed', !!sub);
     }
     pushBtn.addEventListener('click', () => {

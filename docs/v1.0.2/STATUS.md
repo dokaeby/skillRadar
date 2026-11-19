@@ -61,11 +61,19 @@
 
 ## 검증 결과 (2026-11-19, v1.0.2)
 
-- `pytest`: 46 passed (`test_metrics.py` 8개 추가 — 지표 집계/스코프/tracing no-op/metrics_json)
+- `pytest`: 54 passed (`test_metrics.py` 8, `test_digest.py` 3, ranking/repo API 5 추가)
 - `npx pyright`: 0 errors
 - `ruff check`: All checks passed (0 errors)
 - `npm run build` (tsc): 통과 → `src/backend/static/{app,push,sw}.js`
 - Vercel Cron end-to-end: `vercel crons run /api/admin/refresh` → GET 인증 통과 → 3개 플랫폼 `2026-11-19` 스냅샷 생성, Web Push 발송 확인(사용자 수신 확인)
+
+## v1.0.2 E 마일스톤 (2026-11-19) — 랭킹/상세/필터/i18n
+
+- `GET /api/ranking?period=week|month&platform=&lang=` — 기간 내 repo별 stars_today 합계·등장 횟수 집계 랭킹
+- `GET /api/repo/{owner/repo}` + `GET /repo/{full_name}` — readme_excerpt, 3개 언어 요약 탭, 공기반 관련 주제, 수집 메타
+- 주간 digest: KST 월요일 수집 후 `notify_weekly_digest` — 신규/이탈 repo 수, 주간 star 증가 합계, 급상승 Top3를 푸시 1건 발송
+- 프론트: 일간/주간/월간 탭, taxonomy 필터 + 최소 star 슬라이더(클라이언트 측), 카드 제목 → `/repo/{full_name}` 내부 상세
+- UI i18n: ko/en/zh 전환 — `data-i18n` 속성 + `t()` 함수, 요약 언어와 UI 언어 공유 (`SR_T`를 push.ts에도 노출)
 
 ## 미구현 — 현재 스택 내 보강 가능 (마일스톤 후보)
 

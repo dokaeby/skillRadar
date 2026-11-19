@@ -7,6 +7,11 @@
         date: '',
         topic: null,
         topicPlatform: 'all',
+        period: 'daily',
+        taxFilter: 'all',
+        minStars: 0,
+        view: 'list',
+        lastItems: [],
     };
     const grid = document.getElementById('grid');
     const empty = document.getElementById('empty');
@@ -26,6 +31,96 @@
     const topicCount = document.getElementById('topicCount');
     const topicBack = document.getElementById('topicBack');
     const topicPlatformTabs = document.getElementById('topicPlatformTabs');
+    const periodTabs = document.getElementById('periodTabs');
+    const taxSelect = document.getElementById('taxSelect');
+    const minStarsRange = document.getElementById('minStars');
+    const minStarsLabel = document.getElementById('minStarsLabel');
+    const filterBar = document.getElementById('filterBar');
+    const repoView = document.getElementById('repoView');
+    const dateLabelWrap = document.getElementById('dateLabelWrap');
+    // ---- UI i18n (ko/en/zh) ----
+    const I18N = {
+        ko: {
+            today: '오늘', noLicense: '라이선스 없음', updated: '업데이트',
+            subtitle: 'AI 도구 트렌딩', dateLabel: '기준일',
+            periodDaily: '일간', periodWeek: '주간', periodMonth: '월간',
+            topicsTitle: '관심 주제', topicsWindow: '최근 30일',
+            backToTrending: '트렌딩으로 돌아가기',
+            emptyTitle: '아직 수집된 데이터가 없습니다',
+            emptyDesc: '매일 KST 06:00 자동 수집되거나, 관리자가 /api/admin/refresh를 호출하세요.',
+            topicNoRepos: '이 주제의 저장소가 없습니다',
+            topicNoReposDesc: '다른 주제를 선택하거나 트렌딩으로 돌아가세요.',
+            topicsEmpty: '주제 데이터가 없습니다',
+            topicsLoadFail: '주제를 불러오지 못했습니다',
+            loadFail: '데이터를 불러오지 못했습니다.',
+            filterTax: '분류', filterTaxAll: '전체', filterMinStars: '최소 스타',
+            appearancesShort: '회',
+            detailCollected: '수집일', detailPlatform: '플랫폼',
+            detailReadme: 'README', detailSummary: '요약', detailRelated: '관련 주제',
+            detailNotFound: '수집된 저장소가 아닙니다',
+            topicCountFmt: '최근 30일 {count}개 저장소',
+            footerLeft: 'GitHub Search API · 일일 Top 10 · LLM 3줄 요약',
+            pushOn: '알림 받기', pushOff: '알림 중',
+        },
+        en: {
+            today: 'today', noLicense: 'No license', updated: 'Updated',
+            subtitle: 'AI tooling trending', dateLabel: 'Date',
+            periodDaily: 'Daily', periodWeek: 'Weekly', periodMonth: 'Monthly',
+            topicsTitle: 'Topics', topicsWindow: 'Last 30 days',
+            backToTrending: 'Back to trending',
+            emptyTitle: 'No data collected yet',
+            emptyDesc: 'Collected daily at 06:00 KST, or call /api/admin/refresh.',
+            topicNoRepos: 'No repos for this topic',
+            topicNoReposDesc: 'Pick another topic or go back to trending.',
+            topicsEmpty: 'No topic data',
+            topicsLoadFail: 'Failed to load topics',
+            loadFail: 'Failed to load data.',
+            filterTax: 'Category', filterTaxAll: 'All', filterMinStars: 'Min stars',
+            appearancesShort: '×',
+            detailCollected: 'Collected', detailPlatform: 'Platform',
+            detailReadme: 'README', detailSummary: 'Summary', detailRelated: 'Related topics',
+            detailNotFound: 'Repo not found in collected data',
+            topicCountFmt: '{count} repos in last 30 days',
+            footerLeft: 'GitHub Search API · Daily Top 10 · LLM 3-line summary',
+            pushOn: 'Notify me', pushOff: 'Notifying',
+        },
+        zh: {
+            today: '今日', noLicense: '无许可证', updated: '更新于',
+            subtitle: 'AI 工具趋势', dateLabel: '日期',
+            periodDaily: '每日', periodWeek: '每周', periodMonth: '每月',
+            topicsTitle: '关注主题', topicsWindow: '近30天',
+            backToTrending: '返回趋势',
+            emptyTitle: '尚无收集数据',
+            emptyDesc: '每天 KST 06:00 自动收集，或调用 /api/admin/refresh。',
+            topicNoRepos: '该主题暂无仓库',
+            topicNoReposDesc: '请选择其他主题或返回趋势页。',
+            topicsEmpty: '暂无主题数据',
+            topicsLoadFail: '主题加载失败',
+            loadFail: '数据加载失败。',
+            filterTax: '分类', filterTaxAll: '全部', filterMinStars: '最低星标',
+            appearancesShort: '次',
+            detailCollected: '收集日期', detailPlatform: '平台',
+            detailReadme: 'README', detailSummary: '摘要', detailRelated: '相关主题',
+            detailNotFound: '未找到该仓库',
+            topicCountFmt: '近30天 {count} 个仓库',
+            footerLeft: 'GitHub Search API · 每日 Top 10 · LLM 三行摘要',
+            pushOn: '接收通知', pushOff: '通知中',
+        },
+    };
+    /** 현재 언어의 UI 문자열을 반환한다. */
+    /** 입력: key — I18N 키 / 출력: 번역 문자열 / 결과: window.SR_T에도 노출 */
+    function t(key) {
+        return I18N[state.lang]?.[key] ?? I18N.ko[key] ?? key;
+    }
+    window.SR_T = t;
+    /** data-i18n 속성 요소들의 텍스트를 현재 언어로 갱신한다. */
+    /** 입력: 없음 / 출력: 없음 / 결과: DOM 텍스트 갱신 */
+    function applyI18n() {
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+            el.textContent = t(el.dataset.i18n ?? '');
+        });
+        document.title = 'SkillRadar — ' + t('subtitle');
+    }
     const ICON = {
         star: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.2 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>',
         trending: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
@@ -69,7 +164,13 @@
         btn.addEventListener('click', () => {
             state.lang = btn.dataset.lang ?? 'ko';
             setActiveLang(btn);
-            void loadTrending();
+            applyI18n();
+            if (state.view === 'repo')
+                void loadRepoDetail();
+            else if (state.period === 'daily')
+                void loadTrending();
+            else
+                void loadRanking();
         });
     });
     platformTabs.querySelectorAll('button').forEach((btn) => {
@@ -77,13 +178,63 @@
             state.platform = btn.dataset.platform ?? 'claude';
             platformTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('tab-active', b === btn));
             void loadDates();
-            void loadTrending();
+            if (state.period === 'daily')
+                void loadTrending();
+            else
+                void loadRanking();
         });
     });
     dateSelect.addEventListener('change', () => {
         state.date = dateSelect.value;
-        void loadTrending();
+        if (state.period === 'daily')
+            void loadTrending();
     });
+    periodTabs.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            state.period = (btn.dataset.period ?? 'daily');
+            periodTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('tab-active', b === btn));
+            // 일간만 날짜 선택기를 쓴다
+            dateLabelWrap.classList.toggle('hidden', state.period !== 'daily');
+            if (state.period === 'daily') {
+                void loadDates().then(loadTrending);
+            }
+            else {
+                void loadRanking();
+            }
+        });
+    });
+    taxSelect.addEventListener('change', () => {
+        state.taxFilter = taxSelect.value;
+        renderFiltered();
+    });
+    minStarsRange.addEventListener('input', () => {
+        state.minStars = Number(minStarsRange.value);
+        minStarsLabel.textContent = fmtStars(state.minStars);
+        renderFiltered();
+    });
+    /** 현재 필터를 통과하는 아이템만 렌더링한다. */
+    /** 입력: 없음 / 출력: 없음 / 결과: grid DOM 갱신 */
+    function renderFiltered() {
+        const items = state.lastItems.filter(passFilters);
+        if (!items.length) {
+            grid.innerHTML = '';
+            emptyTitle.textContent = t('emptyTitle');
+            emptyDesc.textContent = t('emptyDesc');
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+        grid.innerHTML = items.map(renderCard).join('');
+    }
+    /** 아이템이 taxonomy/최소 star 필터를 통과하는지 판정한다. */
+    /** 입력: item — TrendingItem / 출력: boolean / 결과: 없음 */
+    function passFilters(item) {
+        if (state.taxFilter !== 'all' && item.taxonomy !== state.taxFilter)
+            return false;
+        if (item.stars < state.minStars)
+            return false;
+        return true;
+    }
     /** 로딩 중 카드 자리표시자(skeleton)를 그리드에 렌더링한다. */
     /** 입력: 없음 / 출력: 없음 / 결과: grid.innerHTML 교체 */
     function skeletons() {
@@ -159,19 +310,23 @@
       <div class="flex items-start gap-3">
         <span class="rank-badge shrink-0 w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-slate-700 dark:text-slate-200">${item.rank}</span>
         <div class="min-w-0 flex-1">
-          <a href="${item.repo_url}" target="_blank" rel="noopener"
+          <a href="/repo/${item.repo_full_name}"
              class="font-semibold text-[15px] leading-snug text-slate-800 dark:text-slate-100 hover:text-blue-500 dark:hover:text-blue-400 underline-offset-4 decoration-slate-400/50 hover:underline truncate block transition-colors">
             ${escapeHtml(item.repo_full_name)}
           </a>
           ${description}
-          ${item.platform ? `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${PLATFORM_BADGE[item.platform] ?? 'text-slate-500'}"><span class="w-1.5 h-1.5 rounded-full ${PLATFORM_DOT[item.platform] ?? 'bg-slate-500'}"></span>${item.platform}</span>` : ''}
+          <span class="inline-flex items-center gap-1.5 flex-wrap">
+            ${item.platform ? `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${PLATFORM_BADGE[item.platform] ?? 'text-slate-500'}"><span class="w-1.5 h-1.5 rounded-full ${PLATFORM_DOT[item.platform] ?? 'bg-slate-500'}"></span>${item.platform}</span>` : ''}
+            ${item.taxonomy ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-400/15 border border-indigo-300 dark:border-indigo-400/30 text-indigo-700 dark:text-indigo-300">${escapeHtml(item.taxonomy)}</span>` : ''}
+            ${item.appearances && item.appearances > 1 ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-sky-100 dark:bg-sky-400/15 border border-sky-300 dark:border-sky-400/30 text-sky-700 dark:text-sky-300">${item.appearances}${t('appearancesShort')}</span>` : ''}
+          </span>
           <div class="flex items-center gap-3 mt-2 text-xs text-slate-600 dark:text-slate-400 flex-wrap">
             ${item.license
             ? `<span class="px-2 py-0.5 rounded-md font-bold text-[10px] tracking-wide bg-amber-100 dark:bg-amber-400/15 border border-amber-300 dark:border-amber-400/30 text-amber-800 dark:text-amber-300" title="License: ${escapeHtml(item.license)}">${escapeHtml(licenseShort(item.license))}</span>`
-            : '<span class="px-2 py-0.5 rounded-md text-[10px] tracking-wide bg-slate-100 dark:bg-white/[.04] border border-slate-200 dark:border-white/[.07] text-slate-400 dark:text-slate-500">라이선스 없음</span>'}
+            : `<span class="px-2 py-0.5 rounded-md text-[10px] tracking-wide bg-slate-100 dark:bg-white/[.04] border border-slate-200 dark:border-white/[.07] text-slate-400 dark:text-slate-500">${t('noLicense')}</span>`}
             ${item.language ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.07] font-medium text-slate-700 dark:text-slate-200">${escapeHtml(item.language)}</span>` : ''}
             <span class="inline-flex items-center gap-1">${ICON.star}<span class="font-medium text-slate-600 dark:text-slate-300">${fmtStars(item.stars)}</span></span>
-            <span class="inline-flex items-center gap-1">오늘 ${deltaInner}</span>
+            <span class="inline-flex items-center gap-1">${t('today')} ${deltaInner}</span>
           </div>
         </div>
       </div>
@@ -194,18 +349,15 @@
     /** 토픽 검색 결과를 그리드에 렌더링한다. */
     /** 입력: data — /api/topic-repos 응답 / 출력: 없음 / 결과: grid/empty DOM 갱신 */
     function renderTopicRepos(data) {
-        if (!data.items || !data.items.length) {
+        state.lastItems = data.items ?? [];
+        if (!state.lastItems.length) {
             grid.innerHTML = '';
-            emptyTitle.textContent = '이 주제의 저장소가 없습니다';
-            emptyDesc.textContent = '다른 주제를 선택하거나 트렌딩으로 돌아가세요.';
+            emptyTitle.textContent = t('topicNoRepos');
+            emptyDesc.textContent = t('topicNoReposDesc');
             empty.classList.remove('hidden');
             return;
         }
-        empty.classList.add('hidden');
-        grid.innerHTML = data.items
-            .map((item, i) => renderCard({ ...item, rank: i + 1 }))
-            .join('');
-        updatedAt.textContent = '';
+        renderFiltered();
     }
     /** 인기 토픽 목록을 API에서 가져와 사이드바에 렌더링한다. */
     /** 입력: 없음 / 출력: Promise<void> / 결과: topicList DOM 갱신, allTopics 저장 */
@@ -216,7 +368,7 @@
             const topics = data.topics ?? [];
             allTopics = topics;
             if (!topics.length) {
-                topicList.innerHTML = '<p class="text-xs text-slate-500 px-2 py-3">주제 데이터가 없습니다</p>';
+                topicList.innerHTML = `<p class="text-xs text-slate-500 px-2 py-3">${t('topicsEmpty')}</p>`;
                 return;
             }
             topicList.innerHTML = topics.map((t) => `
@@ -234,7 +386,7 @@
             });
         }
         catch {
-            topicList.innerHTML = '<p class="text-xs text-slate-500 px-2 py-3">주제를 불러오지 못했습니다</p>';
+            topicList.innerHTML = `<p class="text-xs text-slate-500 px-2 py-3">${t('topicsLoadFail')}</p>`;
         }
     }
     /** 선택된 토픽 버튼에 활성 스타일을 적용한다. */
@@ -257,7 +409,7 @@
         state.topicPlatform = 'all';
         markActiveTopic(topic);
         topicTitle.textContent = `#${topic}`;
-        topicCount.textContent = `최근 30일 ${count}개 저장소`;
+        topicCount.textContent = t('topicCountFmt').replace('{count}', String(count));
         topicHeader.classList.remove('hidden');
         trendBar.classList.add('hidden');
         syncTopicPlatformTabs();
@@ -330,7 +482,7 @@
             renderTopicRepos(data);
         }
         catch {
-            grid.innerHTML = '<p class="col-span-full text-center text-red-500 py-10">데이터를 불러오지 못했습니다.</p>';
+            grid.innerHTML = `<p class="col-span-full text-center text-red-500 py-10">${t('loadFail')}</p>`;
         }
     }
     topicBack.addEventListener('click', clearTopic);
@@ -372,20 +524,179 @@
                 params.set('date', state.date);
             const res = await fetch(`/api/trending?${params.toString()}`);
             const data = (await res.json());
-            if (!data.items || !data.items.length) {
+            state.lastItems = data.items ?? [];
+            if (!state.lastItems.length) {
                 grid.innerHTML = '';
+                emptyTitle.textContent = t('emptyTitle');
+                emptyDesc.textContent = t('emptyDesc');
                 empty.classList.remove('hidden');
                 return;
             }
-            empty.classList.add('hidden');
-            grid.innerHTML = data.items.map(renderCard).join('');
-            updatedAt.textContent = `업데이트 ${new Date().toLocaleString('ko-KR')}`;
+            renderFiltered();
+            updatedAt.textContent = `${t('updated')} ${new Date().toLocaleString('ko-KR')}`;
         }
         catch {
-            grid.innerHTML = '<p class="col-span-full text-center text-red-500 py-10">데이터를 불러오지 못했습니다.</p>';
+            grid.innerHTML = `<p class="col-span-full text-center text-red-500 py-10">${t('loadFail')}</p>`;
+        }
+    }
+    /** 주간/월간 집계 랭킹을 로드·렌더링한다. */
+    /** 입력: 없음 / 출력: Promise<void> / 결과: grid DOM 갱신 */
+    async function loadRanking() {
+        skeletons();
+        try {
+            const params = new URLSearchParams({
+                period: state.period === 'week' ? 'week' : 'month',
+                platform: state.platform === 'all' ? 'all' : state.platform,
+                lang: state.lang,
+            });
+            const res = await fetch(`/api/ranking?${params.toString()}`);
+            const data = (await res.json());
+            state.lastItems = data.items ?? [];
+            if (!state.lastItems.length) {
+                grid.innerHTML = '';
+                emptyTitle.textContent = t('emptyTitle');
+                emptyDesc.textContent = t('emptyDesc');
+                empty.classList.remove('hidden');
+                return;
+            }
+            renderFiltered();
+            updatedAt.textContent = `${t('updated')} ${new Date().toLocaleString('ko-KR')}`;
+        }
+        catch {
+            grid.innerHTML = `<p class="col-span-full text-center text-red-500 py-10">${t('loadFail')}</p>`;
+        }
+    }
+    // ---- 저장소 상세 뷰 ----
+    let currentRepo = '';
+    /** 현재 URL 경로에서 /repo/{full_name}을 추출한다. */
+    /** 입력: 없음 / 출력: string — full_name 또는 빈 문자열 / 결과: 없음 */
+    function repoFromPath() {
+        const m = location.pathname.match(/^\/repo\/(.+)$/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+    /** 저장소 상세를 API에서 가져와 repoView에 렌더링한다. */
+    /** 입력: 없음 / 출력: Promise<void> / 결과: repoView DOM 갱신 */
+    async function loadRepoDetail() {
+        currentRepo = repoFromPath();
+        if (!currentRepo) {
+            state.view = 'list';
+            repoView.classList.add('hidden');
+            grid.classList.remove('hidden');
+            return;
+        }
+        state.view = 'repo';
+        grid.classList.add('hidden');
+        empty.classList.add('hidden');
+        topicHeader.classList.add('hidden');
+        repoView.classList.remove('hidden');
+        repoView.innerHTML = '<div class="skeleton h-8 w-1/2 mb-4"></div><div class="skeleton h-4 w-full mb-2"></div><div class="skeleton h-4 w-5/6"></div>';
+        try {
+            const res = await fetch(`/api/repo/${encodeURIComponent(currentRepo)}?lang=${state.lang}`);
+            if (!res.ok)
+                throw new Error('not found');
+            const data = (await res.json());
+            const it = data.item;
+            const badgeMeta = `
+        <div class="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400">
+          ${it.snapshot_platform ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.07] font-medium">${escapeHtml(it.snapshot_platform)}</span>` : ''}
+          ${it.collected_date ? `<span>${t('detailCollected')} ${escapeHtml(it.collected_date)}</span>` : ''}
+          ${it.taxonomy ? `<span class="px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-400/15 border border-indigo-300 dark:border-indigo-400/30 text-indigo-700 dark:text-indigo-300 font-semibold">${escapeHtml(it.taxonomy)}</span>` : ''}
+          ${it.language ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.07] font-medium">${escapeHtml(it.language)}</span>` : ''}
+          <span class="inline-flex items-center gap-1">${ICON.star}<span class="font-medium">${fmtStars(it.stars)}</span></span>
+          ${it.license ? `<span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-100 dark:bg-amber-400/15 border border-amber-300 dark:border-amber-400/30 text-amber-800 dark:text-amber-300">${escapeHtml(licenseShort(it.license))}</span>` : `<span class="px-2 py-0.5 rounded-md text-[10px] bg-slate-100 dark:bg-white/[.04] border border-slate-200 dark:border-white/[.07] text-slate-400">${t('noLicense')}</span>`}
+        </div>`;
+            const summaryLangs = (it.summaries ?? {});
+            const langBtns = Object.keys(summaryLangs).map((lg) => {
+                const label = lg === 'ko' ? '한국어' : lg === 'en' ? 'English' : '中文';
+                return `<button class="sum-lang-btn px-3 py-1.5 rounded-md text-xs font-semibold ${lg === state.lang ? 'bg-slate-200 dark:bg-white/[.1] text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}" data-lang="${lg}">${label}</button>`;
+            }).join('');
+            const summaryHtml = (lg) => `
+        <div class="sum-pane ${lg === state.lang ? '' : 'hidden'}" data-pane="${lg}">
+          <ul class="text-sm leading-relaxed text-slate-600 dark:text-slate-300 space-y-2">
+            ${(summaryLangs[lg] ?? []).map((l) => `<li class="flex gap-2"><span class="mt-[7px] w-1 h-1 rounded-full bg-slate-400/70 shrink-0"></span><span>${escapeHtml(l)}</span></li>`).join('')}
+          </ul>
+        </div>`;
+            const readme = it.readme_excerpt
+                ? `<details class="mt-5"><summary class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500 cursor-pointer hover:text-slate-700 dark:hover:text-slate-300">${t('detailReadme')}</summary><pre class="mt-2 text-xs whitespace-pre-wrap leading-relaxed text-slate-600 dark:text-slate-400 bg-white/[.03] dark:bg-white/[.02] border border-slate-200 dark:border-white/[.06] rounded-xl p-4 max-h-80 overflow-y-auto">${escapeHtml(it.readme_excerpt)}</pre></details>`
+                : '';
+            const related = (it.related_topics ?? []).length
+                ? `<div class="mt-5"><h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500 mb-2">${t('detailRelated')}</h3><div class="flex gap-1.5 flex-wrap">${it.related_topics.map((tp) => `<button class="rel-topic px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/[.04] border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:border-[#d97757]/50 hover:text-[#d97757] transition-colors" data-topic="${escapeHtml(tp)}">#${escapeHtml(tp)}</button>`).join('')}</div></div>`
+                : '';
+            repoView.innerHTML = `
+        <button id="repoBack" class="text-xs text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1 transition-colors">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          ${t('backToTrending')}
+        </button>
+        <article class="card rounded-2xl p-6 fade-up">
+          <div class="flex items-start gap-3">
+            <div class="min-w-0 flex-1">
+              <a href="${escapeHtml(it.repo_url)}" target="_blank" rel="noopener" class="font-bold text-xl text-slate-800 dark:text-slate-100 hover:text-blue-500 dark:hover:text-blue-400 underline-offset-4 hover:underline">${escapeHtml(it.repo_full_name)}</a>
+              ${it.description ? `<p class="text-sm text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed">${escapeHtml(it.description)}</p>` : ''}
+              <div class="mt-3">${badgeMeta}</div>
+            </div>
+            <a href="${escapeHtml(it.repo_url)}" target="_blank" rel="noopener" class="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-white/[.06] border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/[.12] transition-colors">GitHub ${ICON.arrow}</a>
+          </div>
+          <div class="mt-5">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-500">${t('detailSummary')}</h3>
+              <div class="flex gap-1">${langBtns}</div>
+            </div>
+            ${Object.keys(summaryLangs).map(summaryHtml).join('')}
+          </div>
+          ${readme}
+          ${related}
+        </article>`;
+            document.getElementById('repoBack')?.addEventListener('click', () => {
+                location.href = '/';
+            });
+            repoView.querySelectorAll('.sum-lang-btn').forEach((b) => {
+                b.addEventListener('click', () => {
+                    const lg = b.dataset.lang ?? state.lang;
+                    repoView.querySelectorAll('.sum-pane').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== lg));
+                    repoView.querySelectorAll('.sum-lang-btn').forEach((x) => {
+                        const on = x === b;
+                        x.className = `sum-lang-btn px-3 py-1.5 rounded-md text-xs font-semibold ${on ? 'bg-slate-200 dark:bg-white/[.1] text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}`;
+                    });
+                });
+            });
+            repoView.querySelectorAll('.rel-topic').forEach((b) => {
+                b.addEventListener('click', () => {
+                    const tp = b.dataset.topic ?? '';
+                    const cnt = allTopics.find((x) => x.topic === tp)?.count ?? 0;
+                    selectTopic(tp, cnt);
+                    state.view = 'list';
+                    repoView.classList.add('hidden');
+                    grid.classList.remove('hidden');
+                    topicHeader.classList.remove('hidden');
+                });
+            });
+        }
+        catch {
+            repoView.innerHTML = `<p class="text-center text-red-500 py-10">${t('detailNotFound')}</p>`;
         }
     }
     syncTopicPlatformTabs();
-    void loadTopics();
-    void loadDates().then(loadTrending);
+    applyI18n();
+    minStarsLabel.textContent = fmtStars(state.minStars);
+    /** URL 경로에 따라 목록/상세 뷰를 초기화한다. */
+    /** 입력: 없음 / 출력: 없음 / 결과: 적절한 뷰 로드 트리거 */
+    function route() {
+        if (repoFromPath()) {
+            void loadRepoDetail();
+            return;
+        }
+        state.view = 'list';
+        repoView.classList.add('hidden');
+        grid.classList.remove('hidden');
+        topicHeader.classList.remove('hidden');
+        void loadTopics();
+        void loadDates().then(() => {
+            if (state.period === 'daily')
+                void loadTrending();
+            else
+                void loadRanking();
+        });
+    }
+    window.addEventListener('popstate', route);
+    route();
 })();

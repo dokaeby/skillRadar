@@ -41,12 +41,23 @@ class TrendingItem(BaseModel):
     taxonomy: str | None = None
     rank_score: float | None = None
     summary_status: str | None = None
+    appearances: int | None = None  # 주간/월간 집계 등장 횟수
+    readme_excerpt: str | None = None  # 상세 페이지용
+    summaries: dict[str, list[str]] | None = None  # 상세: 3개 언어 요약 전체
+    related_topics: list[str] | None = None  # 상세: 관련 주제명 목록
+    collected_date: str | None = None  # 상세: 수집 기준일
+    snapshot_platform: str | None = None  # 상세: 수집 플랫폼
 
 
 class TrendingResponse(BaseModel):
     platform: str
     date: str
     items: list[TrendingItem]
+
+
+class RepoDetailResponse(BaseModel):
+    item: TrendingItem
+    period_label: str | None = None
 
 
 class SubscribeBody(BaseModel):
@@ -299,6 +310,145 @@ async def related_topics(
     }
 
 
+RANKING_PERIODS = {"week": 7, "month": 30}
+RANKING_MAX_ITEMS = 30
+
+
+@router.get("/api/ranking", response_model=TrendingResponse)
+async def ranking(
+    period: str = "week",
+    platform: str = "all",
+    lang: str = "ko",
+    session: Session = Depends(get_session),
+) -> TrendingResponse:
+    """기간(period=week|month) 내 스냅샷을 repo별로 집계해 랭킹 반환.
+
+    입력:
+      - period: str — "week"(7일) | "month"(30일)
+      - platform: str — "all" 또는 개별 플랫폼
+      - lang: str — 요약 언어 ko|en|zh
+      - session: Session
+    출력: TrendingResponse — items에 appearances(등장 횟수) 포함
+    결과: 없음 (DB 읽기). 정렬: stars_today 합계 → 등장 횟수 → 최신 stars
+    """
+    days = RANKING_PERIODS.get(period)
+    if days is None:
+        raise HTTPException(status_code=400, detail="period은 week|month 중 하나")
+    if platform != "all" and platform not in PLATFORMS:
+        raise HTTPException(status_code=400, detail="platform은 all|claude|chatgpt|gemini")
+    _require_lang(lang)
+
+    since = date_type.today() - timedelta(days=days)
+    rows = session.execute(
+        select(SnapshotItem, Snapshot)
+        .join(Snapshot, SnapshotItem.snapshot_id == Snapshot.id)
+        .where(Snapshot.collected_date >= since)
+    ).all()
+
+    # repo_full_name별 집계: 등장 횟수, stars_today 합계, 최신 스냅샷 행
+    agg: dict[str, dict] = {}
+    for item, snap in rows:
+        if platform != "all" and snap.platform != platform:
+            continue
+        key = item.repo_full_name
+        cur = agg.get(key)
+        if cur is None:
+            agg[key] = {
+                "item": item,
+                "platform": snap.platform,
+                "date": snap.collected_date,
+                "appearances": 1,
+                "gain": item.stars_today or 0,
+            }
+            continue
+        cur["appearances"] += 1
+        cur["gain"] += item.stars_today or 0
+        if (snap.collected_date, -item.rank) > (cur["date"], -cur["item"].rank):
+            cur["item"] = item
+            cur["platform"] = snap.platform
+            cur["date"] = snap.collected_date
+
+    ranked = sorted(
+        agg.values(),
+        key=lambda a: (a["gain"], a["appearances"], a["item"].stars),
+        reverse=True,
+    )[:RANKING_MAX_ITEMS]
+
+    items = []
+    for idx, a in enumerate(ranked):
+        serialized = _serialize_item(a["item"], lang, platform=a["platform"])
+        serialized.rank = idx + 1
+        serialized.appearances = a["appearances"]
+        items.append(serialized)
+    return TrendingResponse(
+        platform=platform,
+        date=date_type.today().isoformat(),
+        items=items,
+    )
+
+
+def _related_topic_names(session: Session, topics: list[str]) -> list[str]:
+    """주어진 토픽들과 공기반으로 등장한 상위 관련 토픽명을 반환한다.
+
+    입력:
+      - session: Session
+      - topics: list[str] — 기준 토픽 목록
+    출력: list[str] — 공기반 빈도 상위 최대 8개 토픽명
+    결과: 없음 (DB 읽기)
+    """
+    want = set(topics or [])
+    if not want:
+        return []
+    co: Counter[str] = Counter()
+    for item, _platform in _recent_items(session):
+        item_topics = set(item.topics or [])
+        if not (want & item_topics):
+            continue
+        for other in item_topics - want:
+            co[other] += 1
+    return [t for t, _c in co.most_common(8)]
+
+
+@router.get("/api/repo/{full_name:path}", response_model=RepoDetailResponse)
+async def repo_detail(
+    full_name: str,
+    lang: str = "ko",
+    session: Session = Depends(get_session),
+) -> RepoDetailResponse:
+    """저장소 상세: 가장 최근 스냅샷의 전체 정보를 반환한다.
+
+    입력:
+      - full_name: str — "owner/repo" 형태 (URL path)
+      - lang: str — 요약 언어 ko|en|zh
+      - session: Session
+    출력: RepoDetailResponse — item(요약·메타) + readme_excerpt + 3개 언어 요약
+    결과: 404 — 수집된 적 없는 repo
+    """
+    _require_lang(lang)
+    row = session.execute(
+        select(SnapshotItem, Snapshot)
+        .join(Snapshot, SnapshotItem.snapshot_id == Snapshot.id)
+        .where(SnapshotItem.repo_full_name == full_name)
+        .order_by(Snapshot.collected_date.desc(), SnapshotItem.rank.asc())
+        .limit(1)
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="수집된 저장소가 아닙니다")
+    item, snap = row
+
+    serialized = _serialize_item(item, lang, platform=snap.platform)
+    serialized.readme_excerpt = item.readme_excerpt
+    serialized.summaries = {
+        "en": item.summary_for("en"),
+        "zh": item.summary_for("zh"),
+        "ko": item.summary_for("ko"),
+    }
+    serialized.related_topics = _related_topic_names(session, item.topics or [])
+    serialized.collected_date = snap.collected_date.isoformat()
+    serialized.snapshot_platform = snap.platform
+    return RepoDetailResponse(item=serialized)
+
+
 # Vercel Cron은 GET으로 호출한다. POST는 수동 실행용으로 함께 허용한다.
 @router.api_route("/api/admin/refresh", methods=["GET", "POST"])
 async def admin_refresh(
@@ -416,6 +566,24 @@ async def index(request: Request) -> HTMLResponse:
       - request: Request
     출력: HTMLResponse
     결과: 없음 (템플릿 렌더 응답)
+    """
+    settings: Settings = request.app.state.settings
+    template = request.app.state.templates.get_template("index.html")
+    return HTMLResponse(
+        template.render(request=request, vapid_public_key=settings.vapid_public_key),
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/repo/{full_name:path}", response_class=HTMLResponse)
+async def repo_page(request: Request, full_name: str) -> HTMLResponse:
+    """저장소 상세 페이지 — SPA 셸을 렌더하고 프론트가 경로로 상세를 표시한다.
+
+    입력:
+      - request: Request
+      - full_name: str — "owner/repo" (경로 파라미터, 프론트에서 사용)
+    출력: HTMLResponse — index 템플릿과 동일
+    결과: 없음 (클라이언트 라우팅용 셸 응답)
     """
     settings: Settings = request.app.state.settings
     template = request.app.state.templates.get_template("index.html")

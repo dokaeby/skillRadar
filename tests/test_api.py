@@ -163,3 +163,46 @@ def test_dates_endpoint(client):
     res = c.get("/api/dates?platform=claude")
     assert res.status_code == 200
     assert "2026-11-18" in res.json()["dates"]
+
+
+def test_ranking_week(client):
+    c, factory = client
+    _seed(factory)
+    res = c.get("/api/ranking?period=week&lang=ko")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["items"][0]["repo_full_name"] == "owner/top-repo"
+    assert data["items"][0]["appearances"] == 1
+    assert data["items"][0]["summary"] == ["ko1", "ko2", "ko3"]
+
+
+def test_ranking_month_and_bad_period(client):
+    c, factory = client
+    _seed(factory)
+    assert c.get("/api/ranking?period=month").status_code == 200
+    assert c.get("/api/ranking?period=year").status_code == 400
+
+
+def test_repo_detail(client):
+    c, factory = client
+    _seed(factory)
+    res = c.get("/api/repo/owner/top-repo?lang=ko")
+    assert res.status_code == 200
+    item = res.json()["item"]
+    assert item["repo_full_name"] == "owner/top-repo"
+    assert item["summaries"]["en"] == ["en1", "en2", "en3"]
+    assert item["summaries"]["ko"] == ["ko1", "ko2", "ko3"]
+    assert item["related_topics"] == []
+    assert item["snapshot_platform"] == "claude"
+
+
+def test_repo_detail_404(client):
+    c, _ = client
+    assert c.get("/api/repo/owner/missing").status_code == 404
+
+
+def test_repo_page_route(client):
+    c, _ = client
+    res = c.get("/repo/owner/top-repo")
+    assert res.status_code == 200
+    assert "SkillRadar" in res.text

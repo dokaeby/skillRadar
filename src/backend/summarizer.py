@@ -5,9 +5,14 @@ import hashlib
 import json
 import logging
 import re
+from contextlib import suppress
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
+
+from backend import metrics as run_metrics
+from backend import tracing
 
 logger = logging.getLogger(__name__)
 
@@ -388,8 +393,36 @@ class Summarizer:
             description=description or "(none)",
             readme=(readme or "(empty)")[:3000],
         )
+        with tracing.llm_span(
+            "llm.summarize",
+            model=self._model,
+            input_text=prompt,
+            metadata={"repo": full_name, "platform": platform},
+        ) as span:
+            return await self._summarize_attempts(
+                prompt, description, full_name, span
+            )
+
+    async def _summarize_attempts(
+        self,
+        prompt: str,
+        description: str | None,
+        full_name: str,
+        span: Any | None,
+    ) -> dict[str, list[str]]:
+        """summarize의 재시도 루프 본체. 지표와 span 출력을 기록한다.
+
+        입력:
+          - prompt: str — 포맷 완료된 프롬프트
+          - description: str | None
+          - full_name: str
+          - span: object — Langfuse observation 또는 None
+        출력: dict[str, list[str]] — 3개 언어 요약
+        결과: 최대 3회 시도 후 실패 시 description 폴백
+        """
         for attempt in range(3):
             last = attempt == 2
+            run_metrics.record_llm_attempt(is_retry=attempt > 0)
             try:
                 async with _get_llm_sem():
                     if self._min_interval:
@@ -412,6 +445,7 @@ class Summarizer:
                 status = exc.response.status_code
                 logger.warning("LLM 호출 실패 %s (%s): %s", full_name, status, exc)
                 if last:
+                    run_metrics.record_fallback()
                     return await fallback_summaries_async(description, full_name)
                 # 429/503은 무료 티어 rate limit·수요 초과 → 잠시 후 재시도
                 await asyncio.sleep(20 if status in (429, 503) else 2)
@@ -419,6 +453,7 @@ class Summarizer:
             except Exception as exc:  # noqa: BLE001 - 항목별 예외 격리 원칙
                 logger.warning("LLM 호출 실패 (%s): %s", full_name, exc)
                 if last:
+                    run_metrics.record_fallback()
                     return await fallback_summaries_async(description, full_name)
                 continue
 
@@ -426,17 +461,24 @@ class Summarizer:
             if data is None:
                 logger.warning("LLM JSON 파싱 실패, 재시도: %s", full_name)
                 if last:
+                    run_metrics.record_fallback()
                     return await fallback_summaries_async(description, full_name)
                 continue
             normalized = _normalize(data)
             if normalized is None:
                 logger.warning("LLM 요약 형식 오류, 재시도: %s", full_name)
                 if last:
+                    run_metrics.record_fallback()
                     return await fallback_summaries_async(description, full_name)
                 continue
             # flash-lite가 ko를 \uXXXX로 출력하다 깨지는 경우가 있어
             # ko에 한글이 없으면 en 라인을 Google 번역으로 생성한다.
             if not any("가" <= ch <= "힣" for line in normalized["ko"] for ch in line):
                 normalized["ko"] = await translate_lines_ko(normalized["en"])
+            run_metrics.record_llm_success(was_retry=attempt > 0)
+            if span is not None:
+                with suppress(Exception):
+                    span.update(output=normalized)
             return normalized
+        run_metrics.record_fallback()
         return await fallback_summaries_async(description, full_name)

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     langsmith_api_key: SecretStr = Field(default=SecretStr(""), max_length=255)
     langsmith_project: str = Field(default="skillradar", max_length=100)
     langsmith_tracing: bool = False
+    langfuse_public_key: SecretStr = Field(default=SecretStr(""), max_length=255)
+    langfuse_secret_key: SecretStr = Field(default=SecretStr(""), max_length=255)
+    langfuse_host: str = Field(default="https://cloud.langfuse.com", max_length=200)
     llm_judge_model: str = Field(default="", max_length=100)  # 비우면 llm_model 사용
     checkpoint_path: str = Field(default="", max_length=500)  # LangGraph SQLite 체크포인터
 

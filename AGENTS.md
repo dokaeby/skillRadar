@@ -16,13 +16,13 @@
 - **정직성**: 확인하지 못한 것을 "된다/안전하다/정확하다"고 단정하지 않는다. 실행 결과로 확인한 것만 보고한다.
   스타 수, 날짜, 라이선스 같은 수치는 API 응답값만 쓰고 추측하거나 계산해서 만들지 않는다.
 - **스코프 통제**: 요청한 마일스톤 범위만 구현한다. 범위 밖 기능은 제안만 한다.
-- **측정 우선**: 프롬프트나 모델을 바꿀 때는 반드시 LangSmith 실험으로 전후 점수를 비교한다. 감으로 판단하지 않는다.
+- **측정 우선**: 프롬프트나 모델을 바꿀 때는 반드시 평가 실험(Langfuse/골든 데이터셋)으로 전후 점수를 비교한다. 감으로 판단하지 않는다.
 
 ## 2. 기술 스택 (확정, 변경 시 승인 필요)
 - Python 3.12+, uv, FastAPI, Pydantic v2, httpx
 - LangChain 1.x (init_chat_model, 구조화 출력, 도구, 문서 처리)
 - LangGraph (StateGraph, 체크포인터는 SQLite로 시작, 필요 시 Postgres)
-- LangSmith (트레이싱, 데이터셋, 평가, 실험)
+- Langfuse Cloud 무료 티어 (LLM 트레이싱·관측성, 실험 비교)
 - 저장: Supabase PostgreSQL (Redis 캐시는 v1.0.2에서 제거 — content_hash DB 캐시 사용)
 - 품질 도구: pyright(strict), ruff, pytest. mypy는 쓰지 않는다.
 - 실행: Docker(실행 위주), 환경 구분(debug/release). release에서는 디버그 로그를 출력하지 않는다.
@@ -34,7 +34,7 @@
 |---|---|---|
 | LangChain | 모델 호출, 구조화 출력(Pydantic), 도구(GitHub/Tavily), 문서 분할 | 상태 관리, 분기 제어 |
 | LangGraph | 다단계 워크플로, 상태, 조건 분기, 재시도, 사람 승인(interrupt), 체크포인트 | 프롬프트 품질 평가 |
-| LangSmith | 모든 실행의 트레이스, 평가 데이터셋, 평가기, 실험 비교, 비용/지연 모니터링 | 비즈니스 로직 |
+| Langfuse | LLM 호출 트레이스·지연 관측성, 평가 실험 기록 | 비즈니스 로직 |
 
 ## 4. 워크플로 (LangGraph)
 상태 모델 `CuratorState`(Pydantic): repo 원본, 정제 텍스트, 요약, 분류, 품질 점수, 재시도 횟수, 오류 목록.
@@ -52,7 +52,7 @@
 모델 라우팅: 대량 처리(요약, 분류)는 로컬 또는 저가 모델, 검증 실패와 어려운 케이스만 상위 모델로 올린다.
 평가용 judge 모델은 생성 모델과 분리한다(자기 채점 금지).
 
-## 5. LangSmith 평가 계획
+## 5. Langfuse 평가 계획
 - 모든 노드 실행을 트레이싱하고, 저장소 ID와 프롬프트 버전을 메타데이터로 남긴다.
 - 골든 데이터셋: 대표 저장소 [N]개에 사람이 만든 정답(분류 라벨, 요약 체크리스트)을 붙여 저장한다.
 - 평가 지표:
@@ -90,7 +90,7 @@ docs/   ARCHITECTURE.md, experiments/, FAILURES.md(실패 사례 분석)
 M0. 스켈레톤: 프로젝트 구조, pyright/ruff/pytest, 설정, Pydantic 스키마
 M1. 수집: GitHub 클라이언트, 캐시, 필터, 저장
 M2. 그래프 v1: classify → summarize → verify (재시도 포함), LangChain 구조화 출력
-M3. LangSmith: 트레이싱, 골든 데이터셋, 평가기, 첫 기준선 측정
+M3. Langfuse: 트레이싱, 골든 데이터셋, 평가기, 첫 기준선 측정
 M4. 개선 실험: 프롬프트/모델 라우팅 비교, 점수·비용·지연 개선 기록
 M5. 랭킹과 관련 주제 추천, 다이제스트 생성(옵션: 사람 승인 노드)
 M6. FastAPI 제공, Docker, 배포 가능한 데모, 포트폴리오 문서

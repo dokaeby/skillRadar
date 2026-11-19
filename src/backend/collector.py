@@ -2,11 +2,13 @@
 
 import asyncio
 import logging
+import time
 from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend import metrics as run_metrics
 from backend.config import Settings
 from backend.github_client import GitHubClient, stars_delta, today_kst
 from backend.graph.pipeline import run_platform_pipeline
@@ -95,11 +97,16 @@ async def collect_platform(
                 "status": row.summary_status,
             }
 
-        state = await run_platform_pipeline(
-            platform, queries, settings, github=gh, summarizer=sm,
-            repo_cache=_repo_cache,
-        )
+        t0 = time.monotonic()
+        with run_metrics.metrics_scope() as m:
+            state = await run_platform_pipeline(
+                platform, queries, settings, github=gh, summarizer=sm,
+                repo_cache=_repo_cache,
+            )
+            run_metrics.record_repos(len(state.ranked))
+            run_metrics.record_duration_ms(int((time.monotonic() - t0) * 1000))
         ranked_repos = state.ranked
+        run_metrics_dict = run_metrics.metrics_dict(m)
 
         # 2) 직전 스냅샷의 star 수 (오늘 증가량 계산용)
         prev_stars = _previous_stars(session, platform, collected)
@@ -109,7 +116,11 @@ async def collect_platform(
             session.delete(existing)
             session.flush()
 
-        snapshot = Snapshot(platform=platform, collected_date=collected)
+        snapshot = Snapshot(
+            platform=platform,
+            collected_date=collected,
+            metrics_json=run_metrics_dict,
+        )
         session.add(snapshot)
         session.flush()
 

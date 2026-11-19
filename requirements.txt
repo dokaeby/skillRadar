@@ -11,4 +11,5 @@ pywebpush>=2.0
 deep-translator>=1.11
 langgraph>=0.2
 langsmith>=0.1
+langfuse>=3.0,<4
 langgraph-checkpoint-sqlite>=2.0

@@ -11,6 +11,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from backend import metrics as run_metrics
 from backend.config import Settings, get_settings
 from backend.github_client import GitHubClient, RepoHit
 from backend.schemas import (
@@ -349,7 +350,9 @@ async def classify(state: CuratorState) -> dict[str, Any]:
         async with sem:
             try:
                 cls = await _cached_classification(state, clean)
-                if cls is None:
+                if cls is not None:
+                    run_metrics.record_cache_hit("classify")
+                else:
                     cls = await _classify_repo(clean, settings)
                 return clean.repo.full_name, cls
             except Exception as exc:  # noqa: BLE001
@@ -443,6 +446,7 @@ async def summarize(state: CuratorState) -> dict[str, Any]:
                         )
                         hit = _cached_result(cached)
                         if hit is not None:
+                            run_metrics.record_cache_hit("summarize")
                             return clean.repo.full_name, hit
                     except Exception as exc:  # noqa: BLE001 - 캐시 실패는 LLM 호출로 진행
                         logger.warning("summary cache 조회 실패 %s: %s", clean.repo.full_name, exc)
@@ -537,6 +541,7 @@ async def verify(state: CuratorState) -> dict[str, Any]:
             return
         # 동일 content_hash로 이전 실행에서 검증을 통과한 요약은 재검증하지 않는다
         if await _was_verified(state, clean):
+            run_metrics.record_cache_hit("verify")
             return
         try:
             async with sem:
@@ -546,6 +551,7 @@ async def verify(state: CuratorState) -> dict[str, Any]:
                     logger.warning("verify 실패 %s: %s", name, exc)
                     errors.append(f"verify:{name}: {exc}")
                     ok = False
+                run_metrics.record_verify(ok)
             while not ok and retries.get(name, 0) < _MAX_RETRIES:
                 retries[name] = retries.get(name, 0) + 1
                 summary = await _summarize_one(summarizer, platform, clean)
@@ -557,6 +563,7 @@ async def verify(state: CuratorState) -> dict[str, Any]:
                     logger.warning("verify 재시도 실패 %s: %s", name, exc)
                     errors.append(f"verify:{name}: {exc}")
                     ok = False
+                run_metrics.record_verify(ok)
             if not ok:
                 summary.status = "unverified"
                 summaries[name] = summary

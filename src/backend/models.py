@@ -31,6 +31,7 @@ class Snapshot(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     platform: Mapped[str] = mapped_column(String(32), nullable=False)
     collected_date: Mapped[date] = mapped_column(Date, nullable=False)
+    metrics_json: Mapped[dict[str, float | int | None] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

@@ -3,7 +3,7 @@
 from collections.abc import Generator
 from functools import lru_cache
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -62,6 +62,24 @@ def init_db(engine: Engine | None = None) -> None:
     """
     eng = engine or get_engine()
     Base.metadata.create_all(eng)
+    _ensure_metrics_column(eng)
+
+
+def _ensure_metrics_column(engine: Engine) -> None:
+    """기존 DB에 snapshots.metrics_json 컬럼이 없으면 추가한다.
+
+    입력: engine — 대상 Engine
+    출력: 없음
+    결과: create_all은 기존 테이블을 변경하지 않으므로 경량 마이그레이션
+    """
+    insp = inspect(engine)
+    if "snapshots" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("snapshots")}
+    if "metrics_json" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE snapshots ADD COLUMN metrics_json JSON"))
 
 
 @lru_cache

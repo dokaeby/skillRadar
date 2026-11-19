@@ -13,7 +13,10 @@
 - **운영 버그 수정**: Supabase pooler `DuplicatePreparedStatement`(psycopg prepared statement 비활성화), 플랫폼 동시 수집 시 런타임 의존성 race 분리.
 - **리팩토링**: 미사용 `judge_summary`·`build_pipeline`·`translate_fallback` 플래그·`stars_today` 상태필드 제거, `langchain`/`python-dotenv` 미사용 의존성 제거, nodes 상태 접근을 `CuratorState` 타입으로 정리, routes 검증/타입 보강.
 - **수집 실패 알림 + 중복 수집 방지**: 전 플랫폼 수집 실패 시 Web Push 알림, 같은 날짜 스냅샷 존재 시 스킵(`?force=true`로 재수집).
-- **content_hash 캐시 확장**: `SummaryCacheFn`→`RepoCacheFn`으로 분류·요약·검증 3개 노드가 동일 해시의 이전 레코드를 재사용. verify는 `status!='ok'` 요약과 이미 검증 통과한 캐시 히트를 스킵해 LLM 호출 절감.
+- **content_hash 캐시 확장**: `SummaryCacheFn`→`RepoCacheFn`으로 분류·요약·검증 3개 노드가 동일 해시의 이전 레코드를 재사용. verify는 `status!='ok'` 요약과 이미 검증 통과한 캐시 히트를 스킵해 LLM 호출 절감. 실측: 캐시 히트 시 플랫폼당 ~120초→~6초.
+- **실행 품질 지표**: `metrics.py` contextvar 집계 — LLM 호출/재시도/재시도 성공률, verify 통과율(fidelity_score), unsupported claim율, 폴백 수, 캐시 히트, 소요시간을 `Snapshot.metrics_json`에 저장. `db.init_db`가 컬럼 자동 추가.
+- **Langfuse Cloud 연동**: `tracing.py` — classify/verify/summarize LLM 호출을 generation span으로 기록. `LANGFUSE_PUBLIC_KEY`/`SECRET_KEY` 없으면 no-op.
+- **CI 회귀 게이트**: `.github/workflows/ci.yml` — ruff/pyright/pytest/frontend build + eval-gate(골든 데이터셋 10개, `baseline.json` accuracy 0.9 대비 회귀 시 실패). `EVAL_CI_ENABLED` 변수 + LLM/GitHub 시크릿 필요.
 
 ## 구현됨
 
@@ -46,7 +49,9 @@
 | rank 고도화 | ✅ | `graph/nodes.rank` | `rank_score` 저장, topic-repos 정렬에 반영 |
 | related 주제 | ✅ | `graph/nodes.related` + `GET /api/related-topics` + 사이드바 칩 UI | 토픽 공기반 점수, 최근 30일 수집분 기준 |
 | 골든 데이터셋 평가 | ✅ | `src/backend/eval/` (dataset.json 10개, metrics.py, run_eval.py) | `python -m backend.eval.run_eval` → docs/experiments/ 기록 |
-| LangSmith | ✅ 준비 완료 | `graph/pipeline.py` env 제어 | `LANGSMITH_API_KEY`+`LANGSMITH_TRACING=true`일 때만 활성 |
+| Langfuse Cloud | ✅ 연동 완료 | `tracing.py` + `llm_tasks`/`summarizer` span | 키 미설정 시 no-op. `LANGFUSE_*` env |
+| 실행 지표 (metrics_json) | ✅ | `metrics.py` + `Snapshot.metrics_json` | fidelity/retry/unsupported율 등 시계열 |
+| CI 회귀 게이트 | ✅ | `.github/workflows/ci.yml` + `eval/run_eval.py --check` | baseline accuracy 0.9, `EVAL_CI_ENABLED` 게이트 |
 | ~~Redis 캐시~~ | ❌ 제거됨 (v1.0.2) | — | 사용처 없어 `storage/cache.py`·의존성·설정 삭제. content_hash 캐시로 대체 |
 | LangGraph 체크포인터 | ✅ | `graph/pipeline.py` `_checkpointer` | `CHECKPOINT_PATH` 지정 시 AsyncSqliteSaver, 미설정 시 MemorySaver |
 | pyright | ✅ 통과 | `pyrightconfig.json` | `npx pyright` 0 errors |
@@ -56,7 +61,7 @@
 
 ## 검증 결과 (2026-11-19, v1.0.2)
 
-- `pytest`: 37 passed (`test_cache.py` Redis 7개 + `judge_summary` 4개 테스트 삭제 반영)
+- `pytest`: 46 passed (`test_metrics.py` 8개 추가 — 지표 집계/스코프/tracing no-op/metrics_json)
 - `npx pyright`: 0 errors
 - `ruff check`: All checks passed (0 errors)
 - `npm run build` (tsc): 통과 → `src/backend/static/{app,push,sw}.js`
@@ -70,12 +75,12 @@
 | ETag/조건부 요청 | GitHub Search API는 ETag 미지원 — Contents API에만 부분 적용 가능 |
 | Docker 이미지 | 현재 Vercel 서버리스 배포, Render 설정만 존재 |
 | pyright strict | 파일별 `# pyright: strict` 점진 적용 여지 |
-| 수집 시간 단축 | 캐시 미스(신규/변경 repo) 시 여전히 ~222초 — LLM rate limit(~15 RPM)이 병목. 캐시 히트 시 플랫폼당 ~6초 (claude 1개 실측) |
+| 수집 시간 단축(잔여) | 캐시 미스 시 ~222초 — LLM rate limit(~15 RPM)이 병목. 호출 수 감소(분류 배치화 등)는 프롬프트 변경이라 평가 게이트와 함께 진행 필요 |
 
 ## 다음 권장 순서
 
 1. AGENTS.md §0 전제 항목 확정 (사용자/배포 형태) — 현재 "공개 서비스 + Vercel"로 간주
-2. LangSmith API 키 발급 시 트레이싱·평가 실험 활성화
+2. Langfuse Cloud API 키 발급 시 트레이싱 활성화 (`LANGFUSE_PUBLIC_KEY`/`SECRET_KEY`) + GitHub 시크릿 `LLM_API_KEY`/`GITHUB_TOKEN` 설정 및 `EVAL_CI_ENABLED=true`로 CI 게이트 활성화
 3. 수집 소요 시간 모니터링 — 캐시 미스 시 ~222초로 300초 제한에 근접. 캐시 히트 일수록 ~수십 초로 단축됨을 실측 확인
 
 ## 알려진 이슈

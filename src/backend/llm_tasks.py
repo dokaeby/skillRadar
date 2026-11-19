@@ -7,10 +7,13 @@ GitHub 저장소 콘텐츠(README/description)는 신뢰할 수 없는 입력이
 
 import asyncio
 import logging
+from contextlib import suppress
 from typing import Any
 
 import httpx
 
+from backend import metrics as run_metrics
+from backend import tracing
 from backend.schemas import Classification
 from backend.summarizer import _extract_json, sanitize_readme
 
@@ -81,6 +84,8 @@ async def _chat_json(
     client: httpx.AsyncClient | None = None,
     temperature: float = 0.1,
     timeout: float = 60.0,
+    trace_name: str = "llm.chat",
+    trace_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """chat/completions를 호출하고 응답 content에서 JSON 객체를 추출한다.
 
@@ -92,6 +97,8 @@ async def _chat_json(
       - client: httpx.AsyncClient | None
       - temperature: float
       - timeout: float
+      - trace_name: str — Langfuse span 이름
+      - trace_meta: dict — span metadata 추가 필드
     출력: dict[str, Any] | None
     결과: LLM 구조화 출력 호출. 실패/파싱 불가 시 None
     """
@@ -100,8 +107,37 @@ async def _chat_json(
     if owns_client:
         client = httpx.AsyncClient(timeout=timeout)
     assert client is not None
+    meta = {"base_url": base_url, **(trace_meta or {})}
+    with tracing.llm_span(
+        trace_name, model=model, input_text=prompt, metadata=meta
+    ) as span:
+        return await _chat_json_attempts(
+            client=client, url=url, api_key=api_key, model=model,
+            prompt=prompt, temperature=temperature, owns_client=owns_client,
+            span=span,
+        )
+
+
+async def _chat_json_attempts(
+    *,
+    client: httpx.AsyncClient,
+    url: str,
+    api_key: str,
+    model: str,
+    prompt: str,
+    temperature: float,
+    owns_client: bool,
+    span: Any | None,
+) -> dict[str, Any] | None:
+    """_chat_json의 재시도 루프 본체. span에 결과를 기록한다.
+
+    입력: _chat_json과 동일 + span — Langfuse observation 또는 None
+    출력: dict[str, Any] | None
+    결과: 없음 (LLM 호출 + 지표 기록)
+    """
     try:
         for attempt in range(2):
+            run_metrics.record_llm_attempt(is_retry=attempt > 0)
             try:
                 resp = await client.post(
                     url,
@@ -132,6 +168,10 @@ async def _chat_json(
             if data is None:
                 logger.warning("LLM 응답 JSON 파싱 실패: %.200s", content)
                 return None
+            run_metrics.record_llm_success(was_retry=attempt > 0)
+            if span is not None:
+                with suppress(Exception):
+                    span.update(output=data)
             return data
         return None
     finally:
@@ -188,6 +228,8 @@ async def classify_repo(
         base_url=base_url,
         model=model,
         client=client,
+        trace_name="llm.classify",
+        trace_meta={"repo": name},
     )
     if data is None:
         return Classification(label="other", confidence=0.0)
@@ -234,6 +276,8 @@ async def verify_summary(
         base_url=base_url,
         model=model,
         client=client,
+        trace_name="llm.verify",
+        trace_meta={"summary_lines": len(summary_lines)},
     )
     if data is None:
         return True

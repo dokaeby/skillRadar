@@ -22,7 +22,10 @@ def db_session(tmp_path):
 
     from backend.models import Base
 
-    engine = create_engine(f"sqlite:///{tmp_path}/test.db", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        f"sqlite:///{tmp_path}/test.db",
+        connect_args={"check_same_thread": False},
+    )
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     session = factory()

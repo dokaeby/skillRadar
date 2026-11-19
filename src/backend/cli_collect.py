@@ -3,11 +3,9 @@
 import asyncio
 import logging
 
-from sqlalchemy.orm import sessionmaker
-
 from backend.collector import collect_all
 from backend.config import get_settings
-from backend.db import get_engine, init_db, session_factory
+from backend.db import init_db, session_factory
 from backend.push import notify_daily_top
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

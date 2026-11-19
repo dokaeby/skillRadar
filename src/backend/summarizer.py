@@ -29,7 +29,11 @@ Repository:
 {readme}
 
 Return this exact JSON shape:
-{{"summary_en": ["...", "...", "..."], "summary_zh": ["...", "...", "..."], "summary_ko": ["...", "...", "..."]}}"""
+{{
+  "summary_en": ["...", "...", "..."],
+  "summary_zh": ["...", "...", "..."],
+  "summary_ko": ["...", "...", "..."]
+}}"""
 
 _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)

@@ -15,13 +15,13 @@ from typing import Any
 from backend.config import Settings, get_settings
 from backend.github_client import GitHubClient, RepoHit
 from backend.schemas import (
-    GitHubLike,
-    SummarizerLike,
     Classification,
+    GitHubLike,
     RankedRepo,
     RelatedTopic,
     RepoClean,
     RepoRaw,
+    SummarizerLike,
     SummaryResult,
 )
 from backend.summarizer import (
@@ -500,7 +500,6 @@ async def verify(state: Any) -> dict[str, Any]:
     if not settings.llm_enabled:
         return {"summaries": summaries, "retries": retries}
 
-    by_name = {c.repo.full_name: c for c in cleans}
     platform = str(_state_get(state, "platform", "claude") or "claude")
     summarizer = _summarizer(state)
     sem = asyncio.Semaphore(4)

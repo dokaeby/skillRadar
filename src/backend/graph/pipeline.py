@@ -2,8 +2,9 @@
 
 import logging
 import os
+from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 from uuid import uuid4
 
 from langgraph.checkpoint.memory import MemorySaver

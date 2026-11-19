@@ -3,7 +3,8 @@
 import hmac
 import logging
 from collections import Counter
-from datetime import date as date_type, timedelta
+from datetime import date as date_type
+from datetime import timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -378,7 +379,10 @@ async def manifest() -> FileResponse:
     출력: FileResponse
     결과: 없음 (정적 파일 응답)
     """
-    return FileResponse(BASE_DIR / "static" / "manifest.json", media_type="application/manifest+json")
+    return FileResponse(
+        BASE_DIR / "static" / "manifest.json",
+        media_type="application/manifest+json",
+    )
 
 
 @router.get("/sw.js")

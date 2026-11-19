@@ -6,8 +6,7 @@ import pytest
 
 from backend.collector import collect_platform
 from backend.github_client import RepoHit
-from backend.models import Snapshot, SnapshotItem
-from backend.summarizer import content_hash
+from backend.models import Snapshot
 
 
 class FakeGitHub:
@@ -131,9 +130,13 @@ async def test_summary_cache_reused_for_same_hash(db_session, settings):
     sm = FakeSummarizer()
     d1, d2 = date(2026, 11, 17), date(2026, 11, 18)
     gh = FakeGitHub({q: [_hit("a/one", 100, description="same desc")]})
-    await collect_platform("claude", db_session, settings, github=gh, summarizer=sm, collected_date=d1)
+    await collect_platform(
+        "claude", db_session, settings, github=gh, summarizer=sm, collected_date=d1
+    )
     calls_after_first = len(sm.calls)
-    await collect_platform("claude", db_session, settings, github=gh, summarizer=sm, collected_date=d2)
+    await collect_platform(
+        "claude", db_session, settings, github=gh, summarizer=sm, collected_date=d2
+    )
     # README도 동일 → content_hash 동일 → LLM 재호출 없어야 함
     assert len(sm.calls) == calls_after_first
 
@@ -148,7 +151,6 @@ async def test_llm_failure_translates_ko_when_enabled(db_session, settings, monk
 
     monkeypatch.setattr("backend.summarizer.translate_ko", fake_translate)
     # collector는 모듈 레벨에서 import한 함수를 쓰므로 summarizer 쪽을 패치
-    import backend.collector as collector_mod
 
     # fallback_summaries_async 내부에서 translate_ko를 참조하므로 summarizer 모듈 패치로 충분
     q = settings.platform_queries()["claude"][0]
@@ -192,7 +194,10 @@ async def test_collect_all_runs_platforms_in_parallel(tmp_path, settings, monkey
     import backend.collector as collector
     from backend.models import Base
 
-    engine = create_engine(f"sqlite:///{tmp_path}/par.db", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        f"sqlite:///{tmp_path}/par.db",
+        connect_args={"check_same_thread": False},
+    )
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
 

@@ -31,7 +31,9 @@ async def run_daily_collect(session_factory: sessionmaker[Session], settings: Se
         session.close()
 
 
-def start_scheduler(session_factory: sessionmaker[Session], settings: Settings) -> AsyncIOScheduler | None:
+def start_scheduler(
+    session_factory: sessionmaker[Session], settings: Settings
+) -> AsyncIOScheduler | None:
     """앱 시작 시 호출. 이미 실행 중이면 그대로 반환한다.
 
     입력: session_factory — 수집 잡에 전달할 세션 팩토리;
@@ -53,7 +55,11 @@ def start_scheduler(session_factory: sessionmaker[Session], settings: Settings) 
     )
     sched.start()
     _scheduler = sched
-    logger.info("스케줄러 시작: 매일 %02d:00 %s", settings.schedule_hour, settings.schedule_timezone)
+    logger.info(
+        "스케줄러 시작: 매일 %02d:00 %s",
+        settings.schedule_hour,
+        settings.schedule_timezone,
+    )
     return sched
 
 

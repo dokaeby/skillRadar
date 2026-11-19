@@ -4,13 +4,12 @@ from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.main import create_app
-from pydantic import SecretStr
-
 from backend.config import Settings
+from backend.main import create_app
 from backend.models import Base, Snapshot, SnapshotItem
 
 
@@ -130,7 +129,10 @@ def test_trending_bad_date(client):
 def test_admin_refresh_requires_token(client):
     c, _ = client
     assert c.post("/api/admin/refresh").status_code == 401
-    assert c.post("/api/admin/refresh", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    resp = c.post(
+        "/api/admin/refresh", headers={"Authorization": "Bearer wrong"}
+    )
+    assert resp.status_code == 401
     # Vercel Cron은 GET으로 호출한다
     assert c.get("/api/admin/refresh").status_code == 401
     assert c.get("/api/admin/refresh", headers={"Authorization": "Bearer wrong"}).status_code == 401

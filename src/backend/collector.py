@@ -8,9 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import Settings
-from backend.github_client import GitHubClient, RepoHit, stars_delta, today_kst
-from backend.models import Snapshot, SnapshotItem
+from backend.github_client import GitHubClient, stars_delta, today_kst
 from backend.graph.pipeline import run_platform_pipeline
+from backend.models import Snapshot, SnapshotItem
 from backend.schemas import GitHubLike, SummarizerLike
 from backend.summarizer import Summarizer, content_hash
 
@@ -54,7 +54,8 @@ async def collect_platform(
     own_gh = github is None
     own_sm = summarizer is None and sm is not None
     try:
-        # 1) LangGraph 큐레이터 파이프라인 실행 (collect→dedupe→sanitize→classify→summarize→verify→rank)
+        # 1) LangGraph 큐레이터 파이프라인 실행
+        #    (collect→dedupe→sanitize→classify→summarize→verify→rank)
         queries = settings.platform_queries().get(platform, [])
 
         async def _cache_lookup(full_name: str, description: str | None, readme: str):

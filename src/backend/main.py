@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from backend.config import Settings, get_settings
-from backend.db import get_engine, init_db, session_factory
+from backend.db import init_db, session_factory
 from backend.routes import router
 from backend.scheduler import start_scheduler, stop_scheduler
 

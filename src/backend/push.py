@@ -98,7 +98,11 @@ async def notify_daily_top(session: Session, settings: Settings) -> int:
     """
     if not settings.push_enabled:
         return 0
-    latest_date = session.execute(select(Snapshot.collected_date).order_by(Snapshot.collected_date.desc()).limit(1)).scalar()
+    latest_date = session.execute(
+        select(Snapshot.collected_date)
+        .order_by(Snapshot.collected_date.desc())
+        .limit(1)
+    ).scalar()
     if latest_date is None:
         return 0
     total = 0

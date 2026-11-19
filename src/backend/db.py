@@ -4,13 +4,14 @@ from collections.abc import Generator
 from functools import lru_cache
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import get_settings
 from backend.models import Base
 
 
-def make_engine(database_url: str):
+def make_engine(database_url: str) -> Engine:
     """DATABASE_URL로 SQLAlchemy 엔진을 만든다. postgres는 psycopg 드라이버를 쓴다.
 
     입력: database_url — sqlite:/// 또는 postgresql:// 접속 문자열
@@ -42,7 +43,7 @@ def make_engine(database_url: str):
 
 
 @lru_cache
-def get_engine():
+def get_engine() -> Engine:
     """설정의 database_url로 엔진을 만든다. 프로세스당 1회 캐시.
 
     입력: 없음 (get_settings()에서 읽음)
@@ -52,7 +53,7 @@ def get_engine():
     return make_engine(get_settings().database_url)
 
 
-def init_db(engine=None) -> None:
+def init_db(engine: Engine | None = None) -> None:
     """테이블이 없으면 만든다. Render 무료 플랜 재시작 대응용 자동 마이그레이션.
 
     입력: engine — 사용할 Engine (None이면 get_engine())
@@ -63,6 +64,7 @@ def init_db(engine=None) -> None:
     Base.metadata.create_all(eng)
 
 
+@lru_cache
 def session_factory() -> sessionmaker[Session]:
     """앱/스케줄러가 공유하는 세션 팩토리.
 
@@ -73,7 +75,7 @@ def session_factory() -> sessionmaker[Session]:
     return sessionmaker(bind=get_engine(), expire_on_commit=False)
 
 
-def get_session() -> Generator[Session]:
+def get_session() -> Generator[Session, None, None]:
     """FastAPI Depends용 세션. 요청이 끝나면 닫는다.
 
     입력: 없음

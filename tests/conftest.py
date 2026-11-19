@@ -46,5 +46,4 @@ def settings(tmp_path):
         llm_api_key=SecretStr(""),
         vapid_public_key="",
         vapid_private_key=SecretStr(""),
-        translate_fallback=False,  # 테스트에서 외부 번역 API 호출 방지
     )

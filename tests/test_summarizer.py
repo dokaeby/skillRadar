@@ -96,7 +96,7 @@ def test_extract_json_with_surrounding_text():
 
 
 def test_normalize_rejects_wrong_count():
-    assert _normalize({"summary_en": ["a"], "summary_zh": ["b"], "summary_ko": ["c"]}, None) is None
+    assert _normalize({"summary_en": ["a"], "summary_zh": ["b"], "summary_ko": ["c"]}) is None
 
 
 def test_content_hash_stable_and_sensitive():

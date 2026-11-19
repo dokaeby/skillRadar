@@ -3,6 +3,7 @@
 import hmac
 import logging
 from collections import Counter
+from collections.abc import Sequence
 from datetime import date as date_type
 from datetime import timedelta
 from pathlib import Path
@@ -11,6 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
 from backend.config import PLATFORMS, Settings, get_settings
@@ -52,11 +54,11 @@ class SubscribeBody(BaseModel):
     keys: dict[str, str]
 
 
-def _serialize_item(item, lang: str, platform: str | None = None) -> TrendingItem:
+def _serialize_item(item: SnapshotItem, lang: str, platform: str | None = None) -> TrendingItem:
     """
 
     입력:
-      - item: Any
+      - item: SnapshotItem
       - lang: str
       - platform: str | None
     출력: TrendingItem
@@ -89,14 +91,24 @@ def _get_snapshot(
       - session: Session
       - platform: str
       - collected: date_type
-    출력: Snapshot | None
-    결과: 없음 (읽기 전용 조회)
+    출력: Snapshot | None — 없으면 None
+    결과: 해당 플랫폼+날짜 스냅샷 1건 조회
     """
     return session.execute(
         select(Snapshot)
         .where(Snapshot.platform == platform, Snapshot.collected_date == collected)
-        .options()
     ).scalar_one_or_none()
+
+
+def _require_lang(lang: str) -> None:
+    """lang 파라미터가 ko|en|zh인지 검증한다.
+
+    입력: lang — 쿼리 파라미터
+    출력: 없음
+    결과: 허용 외 값이면 400 HTTPException
+    """
+    if lang not in ("ko", "en", "zh"):
+        raise HTTPException(status_code=400, detail="lang은 ko|en|zh 중 하나")
 
 
 @router.get("/api/trending", response_model=TrendingResponse)
@@ -118,8 +130,7 @@ async def trending(
     """
     if platform not in PLATFORMS:
         raise HTTPException(status_code=400, detail="platform은 claude|chatgpt|gemini 중 하나")
-    if lang not in ("ko", "en", "zh"):
-        raise HTTPException(status_code=400, detail="lang은 ko|en|zh 중 하나")
+    _require_lang(lang)
     try:
         collected = date_type.fromisoformat(date) if date else date_type.fromisoformat(today_kst())
     except ValueError:
@@ -139,7 +150,7 @@ async def trending(
     return TrendingResponse(
         platform=platform,
         date=snap.collected_date.isoformat(),
-        items=[_serialize_item(i, lang) for i in snap.items],
+        items=[_serialize_item(i, lang, platform=platform) for i in snap.items],
     )
 
 
@@ -169,13 +180,13 @@ TOPIC_WINDOW_DAYS = 30
 TOPIC_MAX_RESULTS = 50
 
 
-def _recent_items(session: Session):
-    """최근 TOPIC_WINDOW_DAYS일 스냅샷의 (item, platform) 목록.
+def _recent_items(session: Session) -> Sequence[Row[SnapshotItem, str]]:
+    """최근 TOPIC_WINDOW_DAYS일 스냅샷의 (item, platform) 행 목록.
 
     입력:
       - session: Session
-    출력: 없음 (None)
-    결과: 없음 (DB 읽기)
+    출력: Sequence[Row[SnapshotItem, str]]
+    결과: 토픽 통계/추천 쿼리의 입력 행 반환
     """
     since = date_type.today() - timedelta(days=TOPIC_WINDOW_DAYS)
     return session.execute(
@@ -229,8 +240,7 @@ async def topic_repos(
         raise HTTPException(status_code=400, detail="topic 파라미터가 필요합니다")
     if platform != "all" and platform not in PLATFORMS:
         raise HTTPException(status_code=400, detail="platform은 all|claude|chatgpt|gemini")
-    if lang not in ("ko", "en", "zh"):
-        raise HTTPException(status_code=400, detail="lang은 ko|en|zh 중 하나")
+    _require_lang(lang)
     limit = max(1, min(limit, 50))
 
     best: dict[str, tuple[SnapshotItem, str]] = {}
@@ -294,7 +304,6 @@ async def related_topics(
 async def admin_refresh(
     request: Request,
     authorization: str | None = Header(default=None),
-    session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict:
     """Bearer ADMIN_TOKEN으로 수동 수집 실행.
@@ -302,7 +311,6 @@ async def admin_refresh(
     입력:
       - request: Request
       - authorization: str | None
-      - session: Session
       - settings: Settings
     출력: dict
     결과: 3개 플랫폼 전체 수집 파이프라인 실행 후 Top1 푸시 발송. 완료까지 대기

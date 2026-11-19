@@ -1,11 +1,11 @@
-"""llm_tasks: 분류/검증/채점 프롬프트와 응답 파싱."""
+"""llm_tasks: 분류/검증 프롬프트와 응답 파싱."""
 
 import json
 
 import httpx
 import pytest
 
-from backend.llm_tasks import classify_repo, judge_summary, verify_summary
+from backend.llm_tasks import classify_repo, verify_summary
 
 
 def _client(payload: dict | None = None, status: int = 200):
@@ -116,40 +116,3 @@ async def test_verify_bad_json_returns_true():
     assert ok is True
 
 
-# --- judge_summary ---
-
-
-@pytest.mark.asyncio
-async def test_judge_score():
-    client = _client({"score": 0.8})
-    score = await judge_summary(
-        readme="# x", summary_lines=["Does X."], client=client, **KW,
-    )
-    assert score == pytest.approx(0.8)
-
-
-@pytest.mark.asyncio
-async def test_judge_clamps_out_of_range():
-    client = _client({"score": 2.5})
-    score = await judge_summary(
-        readme="# x", summary_lines=["Does X."], client=client, **KW,
-    )
-    assert score == 1.0
-
-
-@pytest.mark.asyncio
-async def test_judge_failure_returns_sentinel():
-    client = _client(status=500)
-    score = await judge_summary(
-        readme="# x", summary_lines=["Does X."], client=client, **KW,
-    )
-    assert score == -1.0
-
-
-@pytest.mark.asyncio
-async def test_judge_bad_score_returns_sentinel():
-    client = _client({"score": "high"})
-    score = await judge_summary(
-        readme="# x", summary_lines=["Does X."], client=client, **KW,
-    )
-    assert score == -1.0

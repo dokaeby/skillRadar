@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     vapid_subject: str = Field(default="mailto:admin@example.com", max_length=200)
     schedule_hour: int = Field(default=6, ge=0, le=23)
     schedule_timezone: str = Field(default="Asia/Seoul", max_length=64)
-    translate_fallback: bool = True  # LLM 실패 시 description을 Google 번역으로 한국어화
     queries_path: Path = Path(__file__).parent / "queries.yaml"
     langsmith_api_key: SecretStr = Field(default=SecretStr(""), max_length=255)
     langsmith_project: str = Field(default="skillradar", max_length=100)

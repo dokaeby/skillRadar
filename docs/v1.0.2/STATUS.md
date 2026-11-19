@@ -11,6 +11,7 @@
 - **프론트엔드 경로 이동**: `frontend/src/*.ts` → `src/frontend/*.ts` (`tsconfig*.json` 갱신).
 - **함수 주석**: 전 모듈 함수에 입력/출력/결과 독스트링(JSDoc) 추가.
 - **운영 버그 수정**: Supabase pooler `DuplicatePreparedStatement`(psycopg prepared statement 비활성화), 플랫폼 동시 수집 시 런타임 의존성 race 분리.
+- **리팩토링**: 미사용 `judge_summary`·`build_pipeline`·`translate_fallback` 플래그·`stars_today` 상태필드 제거, `langchain`/`python-dotenv` 미사용 의존성 제거, nodes 상태 접근을 `CuratorState` 타입으로 정리, routes 검증/타입 보강.
 
 ## 구현됨
 
@@ -53,9 +54,9 @@
 
 ## 검증 결과 (2026-11-19, v1.0.2)
 
-- `pytest`: 41 passed (`test_cache.py` Redis 테스트 7개 삭제 반영)
+- `pytest`: 37 passed (`test_cache.py` Redis 7개 + `judge_summary` 4개 테스트 삭제 반영)
 - `npx pyright`: 0 errors
-- `ruff check`: 48 errors — v1.0.1 시점과 동일한 기존 이슈(E501/B008/F401 등), 신규 증가 없음
+- `ruff check`: All checks passed (0 errors)
 - `npm run build` (tsc): 통과 → `src/backend/static/{app,push,sw}.js`
 - Vercel Cron end-to-end: `vercel crons run /api/admin/refresh` → GET 인증 통과 → 3개 플랫폼 `2026-11-19` 스냅샷 생성, Web Push 발송 확인(사용자 수신 확인)
 

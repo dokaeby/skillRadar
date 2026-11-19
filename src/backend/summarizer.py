@@ -71,12 +71,12 @@ def _decode_line_text(s: str) -> str:
     return _STRAY_U.sub("", s)
 
 
-def _loads_lenient(block: str):
+def _loads_lenient(block: str) -> object:
     """
 
     입력:
       - block: str
-    출력: 없음 (None)
+    출력: object — 파싱된 JSON 값 또는 None
     결과: 없음 (파싱 헬퍼)
     """
     for candidate in (block, _preclean_block(block)):
@@ -155,14 +155,13 @@ def sanitize_readme(text: str | None, max_chars: int = 3000) -> str:
     return "\n".join(kept)[:max_chars]
 
 
-def _normalize(data: dict, description: str | None) -> dict[str, list[str]] | None:
-    """LLM 응답을 {en, zh, ko: [3줄]} 형태로 정규화. ko 없으면 en을 번역 대체로 사용.
+def _normalize(data: dict) -> dict[str, list[str]] | None:
+    """LLM 응답을 {en, zh, ko: [3줄]} 형태로 정규화한다.
 
     입력:
-      - data: dict
-      - description: str | None
-    출력: dict[str, list[str]] | None
-    결과: 없음 (LLM 출력 정규화)
+      - data: dict — _extract_json이 반환한 파싱 결과
+    출력: dict[str, list[str]] | None — 정규화 실패 시 None
+    결과: LLMSummary 스키마 검증까지 통과한 3언어 요약 dict 반환
     """
     out: dict[str, list[str]] = {}
     for key, field_name in (("en", "summary_en"), ("zh", "summary_zh"), ("ko", "summary_ko")):
@@ -429,7 +428,7 @@ class Summarizer:
                 if last:
                     return await fallback_summaries_async(description, full_name)
                 continue
-            normalized = _normalize(data, description)
+            normalized = _normalize(data)
             if normalized is None:
                 logger.warning("LLM 요약 형식 오류, 재시도: %s", full_name)
                 if last:

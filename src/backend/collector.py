@@ -16,9 +16,6 @@ from backend.summarizer import Summarizer, content_hash
 
 logger = logging.getLogger(__name__)
 
-TOP_N = 10
-README_CONCURRENCY = 5
-
 
 async def collect_platform(
     platform: str,
@@ -58,15 +55,17 @@ async def collect_platform(
         #    (collect→dedupe→sanitize→classify→summarize→verify→rank)
         queries = settings.platform_queries().get(platform, [])
 
-        async def _cache_lookup(full_name: str, description: str | None, readme: str):
+        async def _cache_lookup(
+            full_name: str, description: str | None, readme: str
+        ) -> dict[str, list[str]] | None:
             """
 
             입력:
               - full_name: str
               - description: str | None
               - readme: str
-            출력: 없음 (None)
-            결과: 없음 (캐시 조회 헬퍼)
+            출력: {"en": [...], "zh": [...], "ko": [...]} 캐시 히트 또는 None
+            결과: 히트 시 LLM 호출 없이 재사용 가능한 요약 dict 반환
             """
             hit = _find_cached_summary(
                 session, full_name, content_hash(description, readme)
@@ -154,14 +153,14 @@ async def collect_all(
     settings: Settings,
     platforms: tuple[str, ...] = ("claude", "chatgpt", "gemini"),
 ) -> list[Snapshot]:
-    """플랫폼별 수집을 병렬 실행한다. 플랫폼마다 독립 세션을 쓰고,
+    """플랫폼별 수집을 병렬 실행한다. 플랫폼마다 독립 세션을 쓴다.
 
     입력:
       - session_factory: sessionmaker[Session]
       - settings: Settings
       - platforms: tuple[str, ...]
     출력: list[Snapshot]
-    결과: 3개 플랫폼을 gather로 병렬 수집. 성공/실패와 무관하게 Snapshot 리스트 반환
+    결과: 플랫폼을 gather로 병렬 수집. 실패한 플랫폼은 건너뛰고 성공분만 반환
     """
 
     async def _one(platform: str) -> Snapshot | None:
@@ -170,7 +169,7 @@ async def collect_all(
         입력:
           - platform: str
         출력: Snapshot | None
-        결과: 없음 (내부 헬퍼)
+        결과: 수집 성공 시 Snapshot, 실패 시 None (플랫폼 격리)
         """
         session = session_factory()
         try:

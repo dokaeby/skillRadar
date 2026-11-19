@@ -5,7 +5,7 @@ from backend.schemas import RelatedTopic
 
 
 class CuratorState(_SchemasState):
-    """LangGraph 상태. related_topics/stars_today는 schemas에 없어 여기서 확장.
+    """LangGraph 상태. related_topics는 schemas에 없어 여기서 확장한다.
 
     입력: 파이프라인 초기 입력 {"platform", "queries"} 및 노드별 갱신 dict
     출력: 각 노드가 갱신하는 누적 상태 (repos_raw→ranked→related_topics)
@@ -13,7 +13,6 @@ class CuratorState(_SchemasState):
     """
 
     related_topics: dict[str, list[RelatedTopic]] = {}
-    stars_today: dict[str, int | None] = {}
 
 
 __all__ = ["CuratorState"]

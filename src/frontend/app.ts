@@ -23,10 +23,8 @@
     platform: 'claude',
     lang: 'ko',
     date: '',
-    dates: [] as string[],
     topic: null as string | null,
     topicPlatform: 'all',
-    topicCount: 0,
   };
 
   const grid = document.getElementById('grid') as HTMLElement;
@@ -385,12 +383,12 @@
     try {
       const res = await fetch(`/api/dates?platform=${state.platform}`);
       const data = (await res.json()) as { dates?: string[] };
-      state.dates = data.dates ?? [];
-      dateSelect.innerHTML = state.dates.length
-        ? state.dates.map((d) => `<option value="${d}">${d}</option>`).join('')
+      const dates = data.dates ?? [];
+      dateSelect.innerHTML = dates.length
+        ? dates.map((d) => `<option value="${d}">${d}</option>`).join('')
         : '<option value="">—</option>';
-      if (state.dates.length) {
-        state.date = state.dates[0];
+      if (dates.length) {
+        state.date = dates[0];
         dateSelect.value = state.date;
       }
     } catch {

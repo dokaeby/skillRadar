@@ -14,6 +14,7 @@ if _SRC not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from jinja2 import Environment, FileSystemLoader
 from starlette.concurrency import run_in_threadpool
 
 from backend.config import Settings, get_settings
@@ -62,15 +63,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
-def _make_templates():
+def _make_templates() -> Environment:
     """Jinja2 템플릿 환경을 만든다.
 
     입력: 없음 (BASE_DIR/templates 사용)
     출력: autoescape가 켜진 jinja2.Environment
     결과: index.html 등 템플릿 로드 가능 상태
     """
-    from jinja2 import Environment, FileSystemLoader
-
     return Environment(loader=FileSystemLoader(str(BASE_DIR / "templates")), autoescape=True)
 
 

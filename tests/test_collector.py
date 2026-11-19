@@ -143,8 +143,7 @@ async def test_summary_cache_reused_for_same_hash(db_session, settings):
 
 @pytest.mark.asyncio
 async def test_llm_failure_translates_ko_when_enabled(db_session, settings, monkeypatch):
-    """translate_fallback=True이면 LLM 실패 시 한국어를 Google 번역으로 변환한다."""
-    settings = settings.model_copy(update={"translate_fallback": True})
+    """LLM 실패 시 한국어를 Google 번역으로 변환한다."""
 
     async def fake_translate(text):
         return f"[KO]{text}"

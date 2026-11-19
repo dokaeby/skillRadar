@@ -4,14 +4,14 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Any
 from uuid import uuid4
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from backend.config import Settings
-from backend.schemas import GitHubLike, SummarizerLike
+from backend.schemas import GitHubLike, SummarizerLike, SummaryCacheFn
 
 from . import nodes
 from .state import CuratorState
@@ -48,25 +48,15 @@ def _build_graph() -> StateGraph:
     return graph
 
 
-def build_pipeline() -> Any:
-    """collect → … → related → END 선형 그래프를 컴파일해 반환한다.
-
-    입력: 없음
-    출력: MemorySaver 체크포인터로 컴파일된 runnable 그래프
-    결과: ainvoke로 플랫폼 파이프라인 1회 실행 가능
-    """
-    return _build_graph().compile(checkpointer=MemorySaver())
-
 
 @asynccontextmanager
-async def _checkpointer(settings: Settings) -> AsyncIterator[Any]:
+async def _checkpointer(settings: Settings) -> AsyncIterator[BaseCheckpointSaver]:
     """checkpoint_path 설정에 따라 SqliteSaver 또는 MemorySaver를 제공한다.
 
     입력: settings — checkpoint_path 포함 설정
     출력: async context manager가 yield하는 체크포인터
     결과: 미설정/미설치 시 MemorySaver로 폴백
     """
-    """checkpoint_path가 있으면 SqliteSaver, 없거나 미설치 시 MemorySaver."""
     if not settings.checkpoint_path:
         yield MemorySaver()
         return
@@ -90,7 +80,7 @@ async def run_platform_pipeline(
     settings: Settings,
     github: GitHubLike | None = None,
     summarizer: SummarizerLike | None = None,
-    summary_cache: Any = None,
+    summary_cache: SummaryCacheFn | None = None,
 ) -> CuratorState:
     """한 플랫폼의 전체 큐레이션 파이프라인을 실행하고 최종 상태를 반환한다.
 

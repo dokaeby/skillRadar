@@ -5,10 +5,8 @@
         platform: 'claude',
         lang: 'ko',
         date: '',
-        dates: [],
         topic: null,
         topicPlatform: 'all',
-        topicCount: 0,
     };
     const grid = document.getElementById('grid');
     const empty = document.getElementById('empty');
@@ -349,12 +347,12 @@
         try {
             const res = await fetch(`/api/dates?platform=${state.platform}`);
             const data = (await res.json());
-            state.dates = data.dates ?? [];
-            dateSelect.innerHTML = state.dates.length
-                ? state.dates.map((d) => `<option value="${d}">${d}</option>`).join('')
+            const dates = data.dates ?? [];
+            dateSelect.innerHTML = dates.length
+                ? dates.map((d) => `<option value="${d}">${d}</option>`).join('')
                 : '<option value="">—</option>';
-            if (state.dates.length) {
-                state.date = state.dates[0];
+            if (dates.length) {
+                state.date = dates[0];
                 dateSelect.value = state.date;
             }
         }

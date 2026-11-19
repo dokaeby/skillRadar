@@ -195,7 +195,9 @@
           ${description}
           ${item.platform ? `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${PLATFORM_BADGE[item.platform] ?? 'text-slate-500'}"><span class="w-1.5 h-1.5 rounded-full ${PLATFORM_DOT[item.platform] ?? 'bg-slate-500'}"></span>${item.platform}</span>` : ''}
           <div class="flex items-center gap-3 mt-2 text-xs text-slate-600 dark:text-slate-400 flex-wrap">
-            ${item.license ? `<span class="px-2 py-0.5 rounded-md font-bold text-[10px] tracking-wide bg-amber-100 dark:bg-amber-400/15 border border-amber-300 dark:border-amber-400/30 text-amber-800 dark:text-amber-300" title="License: ${escapeHtml(item.license)}">${escapeHtml(licenseShort(item.license))}</span>` : ''}
+            ${item.license
+              ? `<span class="px-2 py-0.5 rounded-md font-bold text-[10px] tracking-wide bg-amber-100 dark:bg-amber-400/15 border border-amber-300 dark:border-amber-400/30 text-amber-800 dark:text-amber-300" title="License: ${escapeHtml(item.license)}">${escapeHtml(licenseShort(item.license))}</span>`
+              : '<span class="px-2 py-0.5 rounded-md text-[10px] tracking-wide bg-slate-100 dark:bg-white/[.04] border border-slate-200 dark:border-white/[.07] text-slate-400 dark:text-slate-500">라이선스 없음</span>'}
             ${item.language ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[.05] border border-slate-200 dark:border-white/[.07] font-medium text-slate-700 dark:text-slate-200">${escapeHtml(item.language)}</span>` : ''}
             <span class="inline-flex items-center gap-1">${ICON.star}<span class="font-medium text-slate-600 dark:text-slate-300">${fmtStars(item.stars)}</span></span>
             <span class="inline-flex items-center gap-1">오늘 ${deltaInner}</span>
